@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  LayoutDashboard, Calendar, Boxes, Users, UserCircle, FileText, Search, 
-  Plus, Bell, TrendingUp, AlertTriangle, CheckCircle2, Mail, Briefcase, 
+import {
+  LayoutDashboard, Calendar, Boxes, Users, UserCircle, FileText, Search,
+  Plus, Bell, TrendingUp, AlertTriangle, CheckCircle2, Mail, Briefcase,
   Phone, ShieldCheck, MapPin, Clock, Activity, Filter, ChevronRight,
   Trash2, Edit, Receipt, List, ArrowRight, ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Section, EventService, InventoryItem, Employee, Client, Invoice } from './types';
-import { eventsAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI } from './api';
-import { MOCK_CLIENTS } from './constants';
+import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
+import { eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI } from './api';
+import { MOCK_BILLS } from './constants';
 
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>('events');
   const [searchQuery, setSearchQuery] = useState('');
+  const [financeMode, setFinanceMode] = useState<'insert' | 'list'>('insert');
 
   const renderContent = () => {
     switch (activeSection) {
@@ -21,8 +22,13 @@ export default function App() {
       case 'inventory': return <InventoryList />;
       case 'employees': return <EmployeeList />;
       case 'clients': return <ClientList />;
-      case 'finances': return <FinancesSection />;
-      default: return <div className="p-8 text-center text-text-muted italic">Sección en desarrollo...</div>;
+      case 'finances':
+        return (
+          <FinancesSection
+            mode={financeMode}
+            setMode={setFinanceMode}
+          />
+        );
     }
   };
 
@@ -106,23 +112,23 @@ interface ComboboxOption {
   sublabel?: string;
 }
 
-function Combobox({ options, value, onChange, placeholder = "Buscar..." }: { 
-  options: ComboboxOption[], 
-  value: string | number | undefined, 
+function Combobox({ options, value, onChange, placeholder = "Buscar..." }: {
+  options: ComboboxOption[],
+  value: string | number | undefined,
   onChange: (val: string | number) => void,
   placeholder?: string
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
-  
+
   const selectedOption = options.find(o => o.id === value);
-  const filteredOptions = query === "" 
-    ? options 
+  const filteredOptions = query === ""
+    ? options
     : options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()));
 
   return (
     <div className="relative">
-      <div 
+      <div
         onClick={() => setIsOpen(!isOpen)}
         className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus-within:border-primary transition-all flex items-center justify-between cursor-pointer group"
       >
@@ -136,7 +142,7 @@ function Combobox({ options, value, onChange, placeholder = "Buscar..." }: {
         {isOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -145,8 +151,8 @@ function Combobox({ options, value, onChange, placeholder = "Buscar..." }: {
               <div className="p-3 border-b border-border bg-black/10">
                 <div className="relative">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     autoFocus
                     placeholder="Escribe para filtrar..."
                     className="w-full bg-bg-deep/50 border border-border rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-primary/50 transition-all font-medium"
@@ -210,31 +216,136 @@ function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode, labe
   );
 }
 
-// ─── EVENTOS ────────────────────────────────────────────────────────────────
+// ─── EVENTOS ──────────────────────────────────────────────────────────────── ¡¡¡¡NO TOCAR NUNCA MAS!!!!
 
 function EventsList() {
+  const [selectedClient, setSelectedClient] = useState<number | string | undefined>();
+  const [selectedEventType, setSelectedEventType] = useState<number | string | undefined>();
+  const [selectedEventStatus, setSelectedEventStatus] = useState<number | string | undefined>();
   const [events, setEvents] = useState<EventService[]>([]);
+  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
+  const [eventStatuses, setEventStatuses] = useState<EventStatus[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventService | null>(null);
 
+  const [title, setTitle] = useState('');
+  const [descript, setDescript] = useState('');
+  const [event_date, setEventDate] = useState('');
+  const [e_location, setELocation] = useState('');
+  const [base_price, setBasePrice] = useState('');
+  const [duration_hours, setDurationHours] = useState('');
 
   useEffect(() => {
-    eventsAPI.getAll()
-      .then(setEvents)
-      .catch(() => setError('No se pudieron cargar los eventos.'))
+    Promise.all([
+      eventsAPI.getAll(),
+      clientsAPI.getAll(),
+      eventTypesAPI.getAll(),
+      eventStatusAPI.getAll()
+    ])
+      .then(([eventsData, clientsData, eventTypesData, eventStatusesData]) => {
+        setEvents(eventsData);
+        setClients(clientsData);
+        setEventTypes(eventTypesData);
+        setEventStatuses(eventStatusesData);
+      })
+      .catch(() => setError('No se pudieron cargar los eventos o los tipos de eventos.'))
       .finally(() => setLoading(false));
   }, []);
 
-    const handleEdit = (event: EventService) => {
+  const handleEdit = (event: EventService) => {
     setEditingEvent(event);
+
+    setTitle(event.title);
+    setDescript(event.descript || '');
+    setEventDate(
+      new Date(event.event_date).toISOString().slice(0, 16)
+    );
+    setELocation(event.e_location || event.location || '');
+    setBasePrice(event.base_price.toString());
+    setDurationHours((event.duration_hours ?? 0).toString());
+    setSelectedClient(event.customer_id ?? event.client_id ?? event.client ?? undefined);
+    setSelectedEventType(event.event_type ?? event.event_type_id ?? undefined);
+    setSelectedEventStatus(event.e_status ?? event.status ?? undefined);
+
     setShowModal(true);
   };
 
   const handleCreate = () => {
     setEditingEvent(null);
+
+    setTitle('');
+    setDescript('');
+    setEventDate('');
+    setELocation('');
+    setBasePrice('');
+    setDurationHours('');
+    setSelectedClient(undefined);
+    setSelectedEventType(undefined);
+    setSelectedEventStatus(undefined);
+
     setShowModal(true);
+  };
+
+  const handleDelete = async (eventId: number) => {
+    if (!window.confirm('¿Eliminar este evento? Esta acción no se puede deshacer.')) return;
+
+    try {
+      await eventsAPI.delete(eventId);
+      setEvents((prev) => prev.filter((ev) => ev.id !== eventId));
+    } catch {
+      alert('No se pudo eliminar el evento. Nota: este evento ya tiene facturas registradas. Eliminarlas primero.');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!title.trim() || !selectedClient || !selectedEventType || !selectedEventStatus || !event_date.trim() || !e_location.trim()) {
+      alert('Complete todos los campos obligatorios.');
+      return;
+    }
+
+    const payload = {
+      title: title.trim(),
+      descript: descript.trim(),
+      event_date,
+      e_location: e_location.trim(),
+      base_price: Number(base_price) || 0,
+      duration_hours: Number(duration_hours) || 0,
+      event_type: Number(selectedEventType),
+      e_status: Number(selectedEventStatus),
+      customer_id: Number(selectedClient),
+      client: Number(selectedClient),
+      client_id: Number(selectedClient),
+    };
+
+    try {
+      if (editingEvent) {
+        await eventsAPI.update(editingEvent.id, payload);
+        setEvents((prev) =>
+          prev.map((ev) =>
+            ev.id === editingEvent.id ? { ...ev, ...payload } : ev
+          )
+        );
+      } else {
+        const response = await eventsAPI.create(payload);
+        const createdEvent = response?.created || response?.result?.[0] || response?.result?.recordset?.[0] || response;
+
+        if (createdEvent && typeof createdEvent === 'object' && createdEvent.id != null) {
+          setEvents((prev) => [...prev, { ...createdEvent, e_status: Number(createdEvent.e_status) } as EventService]);
+        } else {
+          const refreshedEvents = await eventsAPI.getAll();
+          setEvents(refreshedEvents);
+        }
+      }
+
+      setShowModal(false);
+    } catch {
+      alert('No se pudo guardar el evento.');
+    }
   };
 
   if (loading) return <LoadingSpinner />;
@@ -244,71 +355,217 @@ function EventsList() {
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Cronograma Maestro</h2>
-          <p className="text-sm text-text-muted mt-1 font-medium italic">Logística y montajes en tiempo real.</p>
+          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">
+            Cronograma Maestro
+          </h2>
+
+          <p className="text-sm text-text-muted mt-1 font-medium italic">
+            Logística y montajes en tiempo real.
+          </p>
         </div>
-        <button className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-95 transition-all">
-          <Plus className="w-4 h-4" /> Nuevo Evento
+
+        <button
+          onClick={handleCreate}
+          className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-95 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          Nuevo Evento
         </button>
       </div>
 
       <AnimatePresence>
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-bg-surface border border-border w-full max-w-2xl rounded-[32px] shadow-2xl p-8 overflow-y-auto max-h-[90vh]">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-bg-surface border border-border w-full max-w-2xl rounded-[32px] shadow-2xl p-8 overflow-y-auto max-h-[90vh]"
+            >
               <div className="flex justify-between items-center mb-8">
                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
-                  {editingEvent ? `Editar Evento #${editingEvent.id}` : 'Registrar Nuevo Evento'}
+                  {editingEvent
+                    ? `Editar Evento #${editingEvent.id}`
+                    : 'Registrar Nuevo Evento'}
                 </h3>
-                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white/5 rounded-full text-text-muted transition-colors"><Plus className="w-6 h-6 rotate-45" /></button>
+
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="p-2 hover:bg-white/5 rounded-full text-text-muted transition-colors"
+                >
+                  <Plus className="w-6 h-6 rotate-45" />
+                </button>
               </div>
-              <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setShowModal(false); }}>
+
+              <form
+                className="space-y-6"
+                onSubmit={handleSubmit}
+              >
                 {editingEvent && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">ID del Registro (Referencia Back-end)</label>
-                    <input type="text" readOnly value={editingEvent.id} className="w-full bg-bg-deep/50 border border-border/50 rounded-2xl px-4 py-3 text-sm text-primary font-mono focus:outline-none cursor-not-allowed" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">
+                      ID del Registro (Referencia Back-end)
+                    </label>
+
+                    <input
+                      type="text"
+                      readOnly
+                      value={editingEvent.id}
+                      className="w-full bg-bg-deep/50 border border-border/50 rounded-2xl px-4 py-3 text-sm text-primary font-mono focus:outline-none cursor-not-allowed"
+                    />
                   </div>
                 )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Título del Evento</label>
-                    <input type="text" defaultValue={editingEvent?.title} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="Ej: Boda Real" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Título del Evento
+                    </label>
+
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="Ej: Boda Real"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Cliente</label>
-                    <Combobox 
-                      options={MOCK_CLIENTS.map(c => ({ id: c.id, label: c.fullname, sublabel: `ID: ${c.id}` }))}
-                      value={editingEvent?.customer_id}
-                      onChange={(val) => {
-                        // Aquí el backend sabrá que cambió
-                      }}
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Cliente
+                    </label>
+
+                    <Combobox
+                      options={clients.map(c => ({
+                        id: c.id,
+                        label: c.fullname || c.name || 'Cliente desconocido',
+                        sublabel: `ID: ${c.id}`
+                      }))}
+                      value={selectedClient}
+                      onChange={(val) => setSelectedClient(val)}
                       placeholder="Seleccionar Cliente"
                     />
                   </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Tipo de Evento
+                    </label>
+
+                    <Combobox
+                      options={eventTypes.map((type) => ({
+                        id: type.id,
+                        label: type.name || `Tipo ${type.id}`,
+                        sublabel: `ID: ${type.id}`
+                      }))}
+                      value={selectedEventType}
+                      onChange={(val) => setSelectedEventType(val)}
+                      placeholder="Seleccionar Tipo de Evento"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Estado del Evento
+                    </label>
+
+                    <Combobox
+                      options={eventStatuses.map((status) => ({
+                        id: status.id,
+                        label: status.name || `Estado ${status.id}`,
+                        sublabel: `ID: ${status.id}`
+                      }))}
+                      value={selectedEventStatus}
+                      onChange={(val) => setSelectedEventStatus(val)}
+                      placeholder="Seleccionar Estado"
+                    />
+                  </div>
+
                   <div className="md:col-span-2 space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Descripción</label>
-                    <textarea defaultValue={editingEvent?.descript} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all h-24" placeholder="Detalles del montaje..." />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Descripción
+                    </label>
+
+                    <textarea
+                      value={descript}
+                      onChange={(e) => setDescript(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all h-24"
+                      placeholder="Detalles del montaje..."
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Fecha y Hora</label>
-                    <input type="datetime-local" defaultValue={editingEvent?.event_date ? new Date(editingEvent.event_date).toISOString().slice(0, 16) : ''} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Fecha y Hora
+                    </label>
+
+                    <input
+                      type="datetime-local"
+                      value={event_date}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Ubicación</label>
-                    <input type="text" defaultValue={editingEvent?.e_location} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="Salón de eventos..." />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Ubicación
+                    </label>
+
+                    <input
+                      type="text"
+                      value={e_location}
+                      onChange={(e) => setELocation(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="Salón de eventos..."
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Presupuesto Base ($)</label>
-                    <input type="number" step="0.01" defaultValue={editingEvent?.base_price} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="0.00" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Presupuesto Base ($)
+                    </label>
+
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={base_price}
+                      onChange={(e) => setBasePrice(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="0.00"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Duración (Horas)</label>
-                    <input type="number" defaultValue={editingEvent?.duration_hours} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="1" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Duración (Horas)
+                    </label>
+
+                    <input
+                      type="number"
+                      value={duration_hours}
+                      onChange={(e) => setDurationHours(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="1"
+                    />
                   </div>
                 </div>
+
                 <div className="pt-6">
-                  <button type="submit" className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[0.98] transition-all">
+                  <button
+                    type="submit"
+                    className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[0.98] transition-all"
+                  >
                     {editingEvent ? 'Guardar Cambios' : 'Confirmar Montaje'}
                   </button>
                 </div>
@@ -321,49 +578,86 @@ function EventsList() {
       <div className="relative before:absolute before:left-[35px] before:top-0 before:bottom-0 before:w-0.5 before:bg-gradient-to-b before:from-primary/50 before:via-border before:to-transparent">
         <div className="space-y-6">
           {events.map((event) => (
-            <motion.div key={event.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex gap-8 group">
+            <motion.div
+              key={event.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex gap-8 group"
+            >
               <div className="w-[70px] shrink-0 flex flex-col items-center pt-1">
                 <div className="w-4 h-4 rounded-full bg-primary border-4 border-bg-deep z-10 group-hover:scale-150 transition-transform" />
               </div>
+
               <div className="flex-1 bg-bg-surface rounded-3xl border border-border hover:border-primary/40 p-6 transition-all group-hover:bg-bg-deep/40">
                 <div className="flex justify-between items-start">
+
                   <div>
-                    <h3 className="text-base font-bold text-white group-hover:text-primary transition-colors">{event.title}</h3>
-                    <p className="text-[11px] text-text-muted mt-1 leading-relaxed line-clamp-2 max-w-xl">{event.descript}</p>
+                    <h3 className="text-base font-bold text-white group-hover:text-primary transition-colors">
+                      {event.title}
+                    </h3>
+
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/80 mt-2">
+                      {event.event_type_name || event.event_type_label || eventTypes.find((type) => type.id === (event.event_type ?? event.event_type_id))?.name || 'Tipo no asignado'}
+                    </p>
+
+                    <p className="text-[11px] text-text-muted mt-1 leading-relaxed line-clamp-2 max-w-xl">
+                      {event.descript}
+                    </p>
+
                     <div className="flex items-center gap-4 mt-4 text-[9px] font-black text-text-muted uppercase tracking-widest">
                       <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded-lg">
                         <Clock className="w-3 h-3 text-primary/60" />
-                        {new Date(event.event_date).toLocaleDateString('es-DO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        {new Date(event.event_date).toLocaleDateString('es-DO', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
                       </span>
+
                       <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded-lg">
                         <MapPin className="w-3 h-3 text-primary/60" />
                         {event.e_location}
                       </span>
+
                       <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded-lg">
                         <Activity className="w-3 h-3 text-primary/60" />
                         {event.duration_hours}h
                       </span>
                     </div>
                   </div>
+
                   <div className="flex flex-col items-end gap-3">
                     <span className="text-[8px] font-black uppercase bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full tracking-widest">
-                      E-#{event.e_status}
+                      {eventStatuses.find((status) => status.id === Number(event.e_status))?.name || `E-#${event.e_status}`}
                     </span>
+
                     <div className="text-right">
-                      <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-0.5">Monto Base</p>
-                      <span className="text-base font-black text-white">${event.base_price.toLocaleString()}</span>
+                      <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-0.5">
+                        Monto Base
+                      </p>
+
+                      <span className="text-base font-black text-white">
+                        ${event.base_price.toLocaleString()}
+                      </span>
                     </div>
-                    
-                    {/* Botones debajo del precio */}
+
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
-                      <button onClick={() => handleEdit(event)} className="p-2 bg-bg-deep border border-border rounded-xl text-text-muted hover:text-white transition-all">
+                      <button
+                        onClick={() => handleEdit(event)}
+                        className="p-2 bg-bg-deep border border-border rounded-xl text-text-muted hover:text-white transition-all"
+                      >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
-                      <button className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all">
+
+                      <button
+                        onClick={() => handleDelete(event.id)}
+                        className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                      >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
+
                 </div>
               </div>
             </motion.div>
@@ -374,31 +668,42 @@ function EventsList() {
   );
 }
 
+
 // ─── INVENTARIO ─────────────────────────────────────────────────────────────
 
 function InventoryList() {
   const [inventory, setInventory] = useState<any[]>([]);
+  const [elementStatuses, setElementStatuses] = useState<EventStatus[]>([]);
+  const [selectedElementStatus, setSelectedElementStatus] = useState<number | string | undefined>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
- const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   useEffect(() => {
-    inventoryAPI.getAll()
-      .then(setInventory)
-      .catch(() => setError('No se pudo cargar el inventario.'))
+    Promise.all([inventoryAPI.getAll(), elementStatusAPI.getAll()])
+      .then(([inventoryData, statusData]) => {
+        setInventory(inventoryData);
+        setElementStatuses(statusData);
+      })
+      .catch(() => setError('No se pudo cargar el inventario o los estados de elementos.'))
       .finally(() => setLoading(false));
   }, []);
 
   const handleEdit = (item: InventoryItem) => {
     setEditingItem(item);
+    setSelectedElementStatus(item.element_type ?? undefined);
     setShowModal(true);
   };
 
   const handleCreate = () => {
     setEditingItem(null);
+    setSelectedElementStatus(undefined);
     setShowModal(true);
   };
+
+  const getInventoryStatusLabel = (item: any) =>
+    elementStatuses.find((status) => status.id === item.element_type)?.name || 'Sin estado';
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;
@@ -410,7 +715,7 @@ function InventoryList() {
           <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Gestión de Stock</h2>
           <p className="text-sm text-text-muted font-medium">Control físico y reposición de recursos de K-DAILY.</p>
         </div>
-        <button 
+        <button
           onClick={handleCreate}
           className="bg-primary text-white px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 flex items-center gap-2 hover:scale-95 transition-all text-nowrap"
         >
@@ -442,15 +747,16 @@ function InventoryList() {
                     <input type="text" defaultValue={editingItem?.element} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="Ej: Cable XLR 5m" />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Tipo de Elemento</label>
-                    <Combobox 
-                      options={[
-                        { id: '1', label: 'Reutilizable', sublabel: 'EQUIPOS' },
-                        { id: '0', label: 'Orgánico', sublabel: 'CONSUMIBLE' }
-                      ]}
-                      value={editingItem?.is_reusable?.toString()}
-                      onChange={(val) => {}}
-                      placeholder="Tipo de Item"
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Estado del Elemento</label>
+                    <Combobox
+                      options={elementStatuses.map((status) => ({
+                        id: status.id,
+                        label: status.name || `Estado ${status.id}`,
+                        sublabel: `ID: ${status.id}`
+                      }))}
+                      value={selectedElementStatus}
+                      onChange={(val) => setSelectedElementStatus(val)}
+                      placeholder="Seleccionar Estado"
                     />
                   </div>
                   <div className="space-y-2">
@@ -471,14 +777,14 @@ function InventoryList() {
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Estado Inicial</label>
-                    <Combobox 
+                    <Combobox
                       options={[
                         { id: '1', label: 'Nuevo', sublabel: 'EXCELENTE' },
                         { id: '2', label: 'Usado', sublabel: 'FUNCIONAL' },
                         { id: '3', label: 'Reparación', sublabel: 'PENDIENTE' }
                       ]}
                       value={editingItem?.e_condition?.toString()}
-                      onChange={(val) => {}}
+                      onChange={(val) => { }}
                       placeholder="Estado del Item"
                     />
                   </div>
@@ -514,6 +820,10 @@ function InventoryList() {
               {item.element}
             </h3>
 
+            <p className="text-[10px] uppercase tracking-[0.2em] font-black text-text-muted mb-2">
+              {getInventoryStatusLabel(item)}
+            </p>
+
             <p className="text-xs text-text-muted mb-5">
               Precio actual: ${item.actual_price}
             </p>
@@ -542,12 +852,12 @@ function InventoryList() {
 
             {/* Acciones flotantes para que siempre sean visibles al hover */}
             <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all z-10 translate-x-4 group-hover:translate-x-0">
-               <button onClick={() => handleEdit(item)} className="p-2 bg-bg-surface border border-border rounded-xl text-text-muted hover:text-primary hover:border-primary/50 transition-all shadow-xl">
-                 <Edit className="w-4 h-4" />
-               </button>
-               <button className="p-2 bg-bg-surface border border-border rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-xl">
-                 <Trash2 className="w-4 h-4" />
-               </button>
+              <button onClick={() => handleEdit(item)} className="p-2 bg-bg-surface border border-border rounded-xl text-text-muted hover:text-primary hover:border-primary/50 transition-all shadow-xl">
+                <Edit className="w-4 h-4" />
+              </button>
+              <button className="p-2 bg-bg-surface border border-border rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-xl">
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           </motion.div>
         ))}
@@ -562,7 +872,7 @@ function EmployeeList() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [selectedProfile, setSelectedProfile] = useState<Employee | null>(null);
 
@@ -593,7 +903,7 @@ const [showModal, setShowModal] = useState(false);
           <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Gestión de Personal</h2>
           <p className="text-sm text-text-muted font-medium italic">Talento humano y asignaciones de K-DAILY.</p>
         </div>
-        <button 
+        <button
           onClick={handleCreate}
           className="bg-primary text-white px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 flex items-center gap-2 hover:scale-95 transition-all"
         >
@@ -638,14 +948,14 @@ const [showModal, setShowModal] = useState(false);
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Puesto (Workstation)</label>
-                    <Combobox 
+                    <Combobox
                       options={[
                         { id: '1', label: 'Logística', sublabel: 'OPERATIVO' },
                         { id: '2', label: 'Ventas', sublabel: 'COMERCIAL' },
                         { id: '3', label: 'Administración', sublabel: 'OFICINA' }
                       ]}
                       value={editingEmployee?.workstation?.toString()}
-                      onChange={(val) => {}}
+                      onChange={(val) => { }}
                       placeholder="Seleccionar Puesto"
                     />
                   </div>
@@ -668,39 +978,39 @@ const [showModal, setShowModal] = useState(false);
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedProfile(null)} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
             <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="relative bg-bg-surface border border-border w-full max-w-xl rounded-[40px] shadow-2xl p-10 overflow-hidden">
-               <div className="flex flex-col items-center text-center">
-                  <div className="w-32 h-32 rounded-full bg-bg-deep border-[8px] border-bg-surface shadow-2xl mb-6 flex items-center justify-center text-4xl font-black text-primary">
-                    {selectedProfile.fullname.split(' ').map(n => n[0]).join('')}
-                  </div>
-                  <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-1">{selectedProfile.fullname}</h3>
-                  <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-8 px-4 py-1.5 bg-primary/10 rounded-full border border-primary/20">
-                    ID Empleado #{selectedProfile.id}
-                  </div>
-                  
-                  <div className="w-full grid grid-cols-2 gap-4 text-left">
-                    <ProfileField label="Workstation" value={selectedProfile.workstation} />
-                    <ProfileField label="Usuario Asignado" value={selectedProfile.assigned_user || "Sin asignar"} />
-                    <ProfileField label="Contratación" value={new Date(selectedProfile.hiring_date).toLocaleDateString()} />
-                    <ProfileField label="Estado" value="Activo" />
-                  </div>
+              <div className="flex flex-col items-center text-center">
+                <div className="w-32 h-32 rounded-full bg-bg-deep border-[8px] border-bg-surface shadow-2xl mb-6 flex items-center justify-center text-4xl font-black text-primary">
+                  {selectedProfile.fullname.split(' ').map(n => n[0]).join('')}
+                </div>
+                <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-1">{selectedProfile.fullname}</h3>
+                <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-8 px-4 py-1.5 bg-primary/10 rounded-full border border-primary/20">
+                  ID Empleado #{selectedProfile.id}
+                </div>
 
-                  <div className="w-full mt-10 pt-10 border-t border-border flex justify-center gap-6">
-                    <button className="flex flex-col items-center gap-2 group">
-                      <div className="p-4 rounded-2xl bg-bg-deep border border-border group-hover:bg-primary group-hover:border-primary transition-all group-hover:text-white text-text-muted">
-                        <Mail className="w-6 h-6" />
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-text-muted group-hover:text-white transition-colors">Email</span>
-                    </button>
-                    <button className="flex flex-col items-center gap-2 group">
-                      <div className="p-4 rounded-2xl bg-bg-deep border border-border group-hover:bg-primary group-hover:border-primary transition-all group-hover:text-white text-text-muted">
-                        <Phone className="w-6 h-6" />
-                      </div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-text-muted group-hover:text-white transition-colors">Llamar</span>
-                    </button>
-                  </div>
+                <div className="w-full grid grid-cols-2 gap-4 text-left">
+                  <ProfileField label="Workstation" value={selectedProfile.workstation} />
+                  <ProfileField label="Usuario Asignado" value={selectedProfile.assigned_user || "Sin asignar"} />
+                  <ProfileField label="Contratación" value={new Date(selectedProfile.hiring_date).toLocaleDateString()} />
+                  <ProfileField label="Estado" value="Activo" />
+                </div>
 
-                  <button onClick={() => setSelectedProfile(null)} className="mt-12 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted hover:text-white hover:underline transition-all">Cerrar Perfil</button>
-               </div>
+                <div className="w-full mt-10 pt-10 border-t border-border flex justify-center gap-6">
+                  <button className="flex flex-col items-center gap-2 group">
+                    <div className="p-4 rounded-2xl bg-bg-deep border border-border group-hover:bg-primary group-hover:border-primary transition-all group-hover:text-white text-text-muted">
+                      <Mail className="w-6 h-6" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-text-muted group-hover:text-white transition-colors">Email</span>
+                  </button>
+                  <button className="flex flex-col items-center gap-2 group">
+                    <div className="p-4 rounded-2xl bg-bg-deep border border-border group-hover:bg-primary group-hover:border-primary transition-all group-hover:text-white text-text-muted">
+                      <Phone className="w-6 h-6" />
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-text-muted group-hover:text-white transition-colors">Llamar</span>
+                  </button>
+                </div>
+
+                <button onClick={() => setSelectedProfile(null)} className="mt-12 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted hover:text-white hover:underline transition-all">Cerrar Perfil</button>
+              </div>
             </motion.div>
           </div>
         )}
@@ -721,7 +1031,7 @@ const [showModal, setShowModal] = useState(false);
               <h3 className="text-lg font-bold text-white mb-1 truncate w-full">{emp.fullname}</h3>
               <p className="text-[9px] font-black text-primary uppercase tracking-[0.15em] mb-6">Puesto ID: {emp.workstation}</p>
 
-              <button 
+              <button
                 onClick={() => setSelectedProfile(emp)}
                 className="w-full py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[0.98] transition-all"
               >
@@ -759,7 +1069,7 @@ function ClientList() {
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
- const [showModal, setShowModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   useEffect(() => {
@@ -789,7 +1099,7 @@ function ClientList() {
           <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Directorio de Clientes</h2>
           <p className="text-sm text-text-muted font-medium italic">Relaciones comerciales y corporativas de K-DAILY.</p>
         </div>
-        <button 
+        <button
           onClick={handleCreate}
           className="bg-primary text-white px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 flex items-center gap-2 hover:scale-95 transition-all"
         >
@@ -826,13 +1136,13 @@ function ClientList() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Tipo de Cliente</label>
-                    <Combobox 
+                    <Combobox
                       options={[
                         { id: '1', label: 'Empresa', sublabel: 'CORPORATIVO' },
                         { id: '2', label: 'Persona Física', sublabel: 'CLIENTE FINAL' }
                       ]}
                       value={editingClient?.kind?.toString()}
-                      onChange={(val) => {}}
+                      onChange={(val) => { }}
                       placeholder="Tipo de Cliente"
                     />
                   </div>
@@ -920,7 +1230,7 @@ function ClientList() {
 // ─── DASHBOARD ──────────────────────────────────────────────────────────────
 
 function DashboardOverview() {
- const [events, setEvents] = useState<EventService[]>([]);
+  const [events, setEvents] = useState<EventService[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -1017,15 +1327,22 @@ function StatCard({ title, value, trend, icon }: { title: string, value: string,
 
 // ─── FINANZAS ───────────────────────────────────────────────────────────────
 
-function FinancesSection({ mode, setMode }: { mode: 'insert' | 'list', setMode: (m: 'insert' | 'list') => void }) {
-  const [bills, setBills] = useState<Bill[]>([]);
+function FinancesSection({
+  mode,
+  setMode
+}: {
+  mode: 'insert' | 'list',
+  setMode: (m: 'insert' | 'list') => void
+}) {
+
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    billsAPI.getAll()
-      .then(setBills)
-      .catch(() => setError('No se pudieron cargar los registros financieros.'))
+    invoicesAPI.getAll()
+      .then(setInvoices)
+      .catch(() => setError('No se pudieron cargar las facturas.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -1035,58 +1352,125 @@ function FinancesSection({ mode, setMode }: { mode: 'insert' | 'list', setMode: 
   if (mode === 'insert') {
     return (
       <div className="space-y-8 max-w-full">
-        <div>
-          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Emisión de Factura</h2>
-          <p className="text-sm text-text-muted mt-1 font-medium italic">Registra un nuevo comprobante en el sistema.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-4xl font-black text-white tracking-tighter uppercase">
+              Emisión de Factura
+            </h2>
+
+            <p className="text-sm text-text-muted mt-1 font-medium italic">
+              Registra un nuevo comprobante en el sistema.
+            </p>
+          </div>
+
+          <button
+            onClick={() => setMode('list')}
+            className="bg-bg-surface border border-border text-text-muted hover:text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-[0.2em] transition-all"
+          >
+            Ver Facturas
+          </button>
         </div>
 
         <div className="bg-bg-surface rounded-3xl border border-border p-10 w-full shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Receipt className="w-64 h-64 text-white" />
           </div>
-          <form className="space-y-8 relative z-10" onSubmit={(e) => e.preventDefault()}>
+
+          <form
+            className="space-y-8 relative z-10"
+            onSubmit={(e) => e.preventDefault()}
+          >
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">Evento Relacionado</label>
-                <Combobox 
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Cliente
+                </label>
+
+                <input
+                  type="text"
+                  placeholder="Nombre del cliente"
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Evento Relacionado
+                </label>
+
+                <Combobox
                   options={[
                     { id: '1', label: 'Gala K-Pro 2024', sublabel: 'LOGÍSTICA' },
                     { id: '2', label: 'Sunset Party', sublabel: 'CORPORATIVO' }
                   ]}
-                  value={""} // Aquí iría el estado
-                  onChange={(val) => {}}
+                  value=""
+                  onChange={() => { }}
                   placeholder="Vincular con Evento"
                 />
               </div>
+
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">Monto Total ($)</label>
-                <input type="number" step="0.01" className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-bold" placeholder="0.00" />
-              </div>
-              <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">Método de Pago</label>
-                <Combobox 
-                  options={[
-                    { id: '1', label: 'Transferencia Bancaria', sublabel: 'BANCO' },
-                    { id: '2', label: 'Efectivo / Cash', sublabel: 'CAJA' },
-                    { id: '3', label: 'Tarjeta de Crédito', sublabel: 'POS' }
-                  ]}
-                  value={""}
-                  onChange={(val) => {}}
-                  placeholder="Forma de Pago"
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Monto Total ($)
+                </label>
+
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-bold"
                 />
               </div>
-              <div className="space-y-3 md:col-span-2">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">Notas del comprobante</label>
-                <input type="text" className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all" placeholder="Detalles adicionales del pago..." />
-              </div>
+
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">Fecha de Emisión</label>
-                <input type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all" />
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Fecha de Emisión
+                </label>
+
+                <input
+                  type="date"
+                  defaultValue={new Date().toISOString().split('T')[0]}
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Fecha Límite
+                </label>
+
+                <input
+                  type="date"
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Estado
+                </label>
+
+                <Combobox
+                  options={[
+                    { id: 'Paid', label: 'Pagada', sublabel: 'COMPLETADA' },
+                    { id: 'Pending', label: 'Pendiente', sublabel: 'EN ESPERA' },
+                    { id: 'Overdue', label: 'Vencida', sublabel: 'ATRASADA' }
+                  ]}
+                  value=""
+                  onChange={() => { }}
+                  placeholder="Estado de Factura"
+                />
               </div>
             </div>
+
             <div className="pt-6">
-              <button type="submit" className="w-full bg-primary text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-primary/30 hover:scale-[0.99] transition-all flex items-center justify-center gap-3">
-                <Receipt className="w-5 h-5" /> Generar Comprobante Oficial
+              <button
+                type="submit"
+                className="w-full bg-primary text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-primary/30 hover:scale-[0.99] transition-all flex items-center justify-center gap-3"
+              >
+                <Receipt className="w-5 h-5" />
+                Generar Factura Oficial
               </button>
             </div>
           </form>
@@ -1097,42 +1481,117 @@ function FinancesSection({ mode, setMode }: { mode: 'insert' | 'list', setMode: 
 
   return (
     <div className="space-y-8">
+
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Registros de Facturación</h2>
-          <p className="text-sm text-text-muted mt-1 font-medium italic">Historial completo de movimientos emitidos.</p>
+          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">
+            Registros de Facturación
+          </h2>
+
+          <p className="text-sm text-text-muted mt-1 font-medium italic">
+            Historial completo de facturas emitidas.
+          </p>
         </div>
+
+        <button
+          onClick={() => setMode('insert')}
+          className="bg-primary text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-[0.2em] transition-all hover:scale-[0.98]"
+        >
+          Nueva Factura
+        </button>
       </div>
 
       <div className="bg-bg-surface rounded-3xl border border-border overflow-hidden shadow-xl">
         <table className="w-full text-left border-collapse">
+
           <thead>
             <tr className="bg-black/40 border-b border-border">
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">ID Transacción</th>
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Evento / Concepto</th>
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Monto Neto</th>
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Fecha Emisión</th>
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted text-right">Control</th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                método de pago
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Evento
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Monto
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Estado
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Fecha
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted text-right">
+                Control
+              </th>
+
             </tr>
           </thead>
+
           <tbody className="divide-y divide-border">
-            {bills.map(bill => (
-              <tr key={bill.id} className="hover:bg-primary/5 transition-all group">
-                <td className="px-8 py-6 font-mono text-xs text-primary group-hover:font-black transition-all font-medium">#{bill.id}</td>
-                <td className="px-8 py-6 text-sm font-bold text-white">Evento Ref: {bill.event_id}</td>
-                <td className="px-8 py-6 text-sm font-black text-white">${bill.amount.toLocaleString()}</td>
+            {invoices.map((invoice) => (
+              <tr
+                key={invoice.id}
+                className="hover:bg-primary/5 transition-all group"
+              >
+
+                <td className="px-8 py-6 text-sm font-bold text-white">
+                  {invoice.payment_method}
+                </td>
+
+                <td className="px-8 py-6 text-sm text-text-muted">
+                  {invoice.event_title}
+                </td>
+
+                <td className="px-8 py-6 text-sm font-black text-white">
+                  ${Number(invoice.amount).toLocaleString()}
+                </td>
+
                 <td className="px-8 py-6">
-                  <span className="px-3 py-1 bg-bg-deep border border-border rounded-lg text-[10px] font-black text-text-muted uppercase">
-                    {new Date(bill.payment_date).toLocaleDateString('es-DO')}
+                  <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase border bg-green-500/10 text-green-400 border-green-500/20">
+                    Procesado
                   </span>
                 </td>
-                <td className="px-8 py-6 text-right space-x-3">
-                  <button className="p-2.5 text-text-muted hover:text-primary bg-bg-deep border border-border rounded-xl transition-all"><Edit className="w-4 h-4" /></button>
-                  <button className="p-2.5 text-text-muted hover:text-red-400 bg-bg-deep border border-border rounded-xl transition-all"><Trash2 className="w-4 h-4" /></button>
+
+                <td className="px-8 py-6">
+                  <span className="px-3 py-1 bg-bg-deep border border-border rounded-lg text-[10px] font-black text-text-muted uppercase">
+                    {new Date(invoice.payment_date).toLocaleDateString('es-DO')}
+                  </span>
                 </td>
+
+                <td className="px-8 py-6 text-right space-x-3">
+                  <button className="p-2.5 text-text-muted hover:text-primary bg-bg-deep border border-border rounded-xl transition-all">
+                    <Edit className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      try {
+                        await invoicesAPI.delete(invoice.id);
+
+                        setInvoices((prev) =>
+                          prev.filter((i) => i.id !== invoice.id)
+                        );
+                      } catch {
+                        alert('No se pudo eliminar la factura.');
+                      }
+                    }}
+                    className="p-2.5 text-text-muted hover:text-red-400 bg-bg-deep border border-border rounded-xl transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
+
               </tr>
             ))}
           </tbody>
+
         </table>
       </div>
     </div>
@@ -1140,5 +1599,9 @@ function FinancesSection({ mode, setMode }: { mode: 'insert' | 'list', setMode: 
 }
 
 function PlaceholderSection({ label }: { label: string }) {
-  return <div className="p-20 text-center border-2 border-dashed border-border rounded-[40px] text-[10px] font-black text-text-muted uppercase tracking-[0.4em]">{label}</div>;
+  return (
+    <div className="p-20 text-center border-2 border-dashed border-border rounded-[40px] text-[10px] font-black text-text-muted uppercase tracking-[0.4em]">
+      {label}
+    </div>
+  );
 }

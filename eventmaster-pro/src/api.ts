@@ -5,9 +5,6 @@ const headers = {
   'Content-Type': 'application/json',
 };
 
-/**
- * Fetch wrapper with error handling
- */
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   
@@ -31,27 +28,58 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   }
 }
 
-
+//---------------------------------------------EVENTOS/---------------------------------------------//
 // ============ EVENTS API ============
-// ⚠️ No hay una ruta /events genérica — usando eventServices como base
 export const eventsAPI = {
-  getAll:    ()              => fetchAPI('/eventServices/'),
+  getAll:    ()              => fetchAPI('/eventServices'),
   getById:   (id: number)   => fetchAPI(`/eventServices/${id}`),
   create:    (data: any)    => fetchAPI('/eventServices', { method: 'POST', body: JSON.stringify(data) }),
   update:    (id: number, data: any) => fetchAPI(`/eventServices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete:    (id: number)   => fetchAPI(`/eventServices/${id}`, { method: 'DELETE' }),
 };
 
+// ============ TIPOS DE EVENTOS API ============
+export const eventTypesAPI = {
+  getAll:    ()              => fetchAPI('/eventTypes'),
+  getById:   (id: number)   => fetchAPI(`/eventTypes/${id}`),
+  create:    (data: any)    => fetchAPI('/eventTypes', { method: 'POST', body: JSON.stringify(data) }),
+  update:    (id: number, data: any) => fetchAPI(`/eventTypes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete:    (id: number)   => fetchAPI(`/eventTypes/${id}`, { method: 'DELETE' }),
+};
+
+// ============ STATUS DE EVENTOS ============
+export const eventStatusAPI = {
+  getAll:    ()              => fetchAPI('/eventStatus'),
+  getById:   (id: number)   => fetchAPI(`/eventStatus/${id}`),
+  create:    (data: any)    => fetchAPI('/eventStatus/create', { method: 'POST', body: JSON.stringify(data) }),
+  update:    (data: any)    => fetchAPI('/eventStatus/edit', { method: 'PUT', body: JSON.stringify(data) }),
+  delete:    (id: number)   => fetchAPI(`/eventStatus/${id}`, { method: 'DELETE' }),
+};
+
+
+//---------------------------------------------INVENTARIO---------------------------------------------//
+
 // ============ INVENTORY API ============
 export const inventoryAPI = {
   getAll:    ()              => fetchAPI('/inventory'),
   getById:   (id: number)   => fetchAPI(`/inventory/${id}`),
-  create:    (data: any)    => fetchAPI(' /inventory', { method: 'POST', body: JSON.stringify(data) }),
+  create:    (data: any)    => fetchAPI('/inventory', { method: 'POST', body: JSON.stringify(data) }),
   update:    (id: number, data: any) => fetchAPI(`/inventory/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete:    (id: number)   => fetchAPI(`/inventory/${id}`, { method: 'DELETE' }),
   getAlerts: ()              => fetchAPI('/inventoryAlerts'),  // ← guión → camelCase
 };
 
+// ============ element STATUS API ============
+export const elementStatusAPI = {
+  getAll:    ()              => fetchAPI('/elementStatus'),
+  getById:   (id: number)   => fetchAPI(`/elementStatus/${id}`),
+  create:    (data: any)    => fetchAPI('/elementStatus', { method: 'POST', body: JSON.stringify(data) }),
+  update:    (id: number, data: any) => fetchAPI(`/elementStatus/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete:    (id: number)   => fetchAPI(`/elementStatus/${id}`, { method: 'DELETE' }),
+};
+
+
+//---------------------------------------------EMPLEADOS---------------------------------------------//
 // ============ EMPLOYEES API ============
 export const employeesAPI = {
   getAll:    ()              => fetchAPI('/employees'),
@@ -78,3 +106,4 @@ export const invoicesAPI = {
   update:    (id: string, data: any) => fetchAPI(`/bills/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete:    (id: string)   => fetchAPI(`/bills/${id}`, { method: 'DELETE' }),
 };
+

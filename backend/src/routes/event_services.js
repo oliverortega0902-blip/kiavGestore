@@ -3,8 +3,8 @@ import { createService, editService, selectService, deleteService, getAllEventSe
 
 const router = express.Router();
 
-router.post("/create", createService);
-router.put("/edit", editService);
+router.post("/", createService);
+router.put("/:id", editService);
 router.get("/:id", selectService);
 router.delete("/:id", deleteService);
 router.get("/", getAllEventServices);
