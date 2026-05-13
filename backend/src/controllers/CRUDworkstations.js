@@ -73,7 +73,7 @@ export const getAllWorkstations = async (req, res) => {
     const pool = getPool();
 
     const result = await pool.request()
-      .query("SELECT * FROM vw_workstations ORDER BY name");
+      .query("SELECT * FROM vw_workstations ORDER BY title");
 
     res.json(result.recordset);
 

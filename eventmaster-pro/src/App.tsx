@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
-import { eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI } from './api';
+import { eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI } from './api';
 import { MOCK_BILLS } from './constants';
 
 export default function App() {
@@ -669,131 +669,490 @@ function EventsList() {
 }
 
 
-// ─── INVENTARIO ─────────────────────────────────────────────────────────────
+// ─── INVENTARIO ───────────────────────────────────────────────────────────── NO TOOCAR NUNCAAAAAA!!!!!
 
 function InventoryList() {
-  const [inventory, setInventory] = useState<any[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [elementStatuses, setElementStatuses] = useState<EventStatus[]>([]);
-  const [selectedElementStatus, setSelectedElementStatus] = useState<number | string | undefined>();
+
+  const [selectedElementStatus, setSelectedElementStatus] = useState<number | undefined>();
+  const [selectedCondition, setSelectedCondition] = useState<number | undefined>();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
+  // FORM STATES
+  const [element, setElement] = useState('');
+  const [actualPrice, setActualPrice] = useState('');
+  const [stockActual, setStockActual] = useState('');
+  const [stockAlert, setStockAlert] = useState('');
+
   useEffect(() => {
-    Promise.all([inventoryAPI.getAll(), elementStatusAPI.getAll()])
+    Promise.all([
+      inventoryAPI.getAll(),
+      elementStatusAPI.getAll()
+    ])
       .then(([inventoryData, statusData]) => {
         setInventory(inventoryData);
         setElementStatuses(statusData);
       })
-      .catch(() => setError('No se pudo cargar el inventario o los estados de elementos.'))
+      .catch(() => {
+        setError('No se pudo cargar el inventario o los estados.');
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  const handleEdit = (item: InventoryItem) => {
-    setEditingItem(item);
-    setSelectedElementStatus(item.element_type ?? undefined);
-    setShowModal(true);
+  const resetForm = () => {
+    setElement('');
+    setActualPrice('');
+    setStockActual('');
+    setStockAlert('');
+
+    setSelectedElementStatus(undefined);
+    setSelectedCondition(undefined);
   };
 
   const handleCreate = () => {
     setEditingItem(null);
-    setSelectedElementStatus(undefined);
+
+    resetForm();
+
     setShowModal(true);
   };
 
-  const getInventoryStatusLabel = (item: any) =>
-    elementStatuses.find((status) => status.id === item.element_type)?.name || 'Sin estado';
+  const handleEdit = (item: InventoryItem) => {
+    setEditingItem(item);
 
-  if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage message={error} />;
+    setElement(item.element || '');
+
+    setActualPrice(
+      item.actual_price?.toString() || ''
+    );
+
+    setStockActual(
+      item.stock_actual?.toString() || ''
+    );
+
+    setStockAlert(
+      item.stock_alert?.toString() || ''
+    );
+
+    setSelectedElementStatus(
+      item.element_type
+        ? Number(item.element_type)
+        : undefined
+    );
+
+    setSelectedCondition(
+      item.state
+        ? Number(item.state)
+        : 1
+    );
+
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    const confirmed = window.confirm(
+      '¿Seguro que deseas eliminar este recurso?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await inventoryAPI.delete(id);
+
+      setInventory((prev) =>
+        prev.filter((item) => item.id !== id)
+      );
+    } catch (err) {
+      console.error(err);
+
+      alert('No se pudo eliminar el recurso.');
+    }
+  };
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+
+    if (!element.trim()) {
+      alert('El nombre del elemento es obligatorio.');
+      return;
+    }
+
+    if (
+      selectedElementStatus === undefined
+    ) {
+      alert(
+        'Selecciona un estado del elemento.'
+      );
+
+      return;
+    }
+
+    const payload = {
+      element: element.trim(),
+
+      unit_price:
+        Number(actualPrice) || 0,
+
+      actual_price:
+        Number(actualPrice) || 0,
+
+      stock_actual:
+        Number(stockActual) || 0,
+
+      stock_alert:
+        Number(stockAlert) || 0,
+
+      // FK RELACIONAL
+      element_type:
+        selectedElementStatus,
+
+      state:
+        selectedCondition || 1,
+
+      act_date:
+        new Date().toISOString()
+    };
+
+    try {
+
+      if (editingItem) {
+
+        await inventoryAPI.update(
+          editingItem.id,
+          payload
+        );
+
+        setInventory((prev) =>
+          prev.map((item) =>
+            item.id === editingItem.id
+              ? {
+                ...item,
+                ...payload
+              }
+              : item
+          )
+        );
+
+      } else {
+
+        const response =
+          await inventoryAPI.create(payload);
+
+        const createdItem =
+          response?.created ||
+          response?.result?.[0] ||
+          response;
+
+        if (createdItem?.id != null) {
+
+          setInventory((prev) => [
+            ...prev,
+            createdItem
+          ]);
+
+        } else {
+
+          const refreshedInventory =
+            await inventoryAPI.getAll();
+
+          setInventory(
+            refreshedInventory
+          );
+        }
+      }
+
+      setShowModal(false);
+
+      resetForm();
+
+    } catch (err) {
+      console.error(err);
+
+      alert(
+        'No se pudo guardar el recurso.'
+      );
+    }
+  };
+
+  const getInventoryStatusLabel = (
+    item: InventoryItem
+  ) =>
+    elementStatuses.find(
+      (status) =>
+        Number(status.id) ===
+        Number(item.element_type)
+    )?.name || 'Sin estado';
+
+  if (loading)
+    return <LoadingSpinner />;
+
+  if (error)
+    return (
+      <ErrorMessage message={error} />
+    );
 
   return (
     <div className="space-y-8">
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+
         <div>
-          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Gestión de Stock</h2>
-          <p className="text-sm text-text-muted font-medium">Control físico y reposición de recursos de K-DAILY.</p>
+          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">
+            Gestión de Stock
+          </h2>
+
+          <p className="text-sm text-text-muted font-medium">
+            Control físico y reposición de recursos de K-DAILY.
+          </p>
         </div>
+
         <button
           onClick={handleCreate}
           className="bg-primary text-white px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 flex items-center gap-2 hover:scale-95 transition-all text-nowrap"
         >
-          <Plus className="w-4 h-4" /> Añadir Recurso
+          <Plus className="w-4 h-4" />
+          Añadir Recurso
         </button>
       </div>
 
       <AnimatePresence>
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-bg-surface border border-border w-full max-w-2xl rounded-[32px] shadow-2xl p-8 overflow-y-auto max-h-[90vh]">
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() =>
+                setShowModal(false)
+              }
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{
+                scale: 0.9,
+                opacity: 0
+              }}
+              animate={{
+                scale: 1,
+                opacity: 1
+              }}
+              exit={{
+                scale: 0.9,
+                opacity: 0
+              }}
+              className="relative bg-bg-surface border border-border w-full max-w-2xl rounded-[32px] shadow-2xl p-8 overflow-y-auto max-h-[90vh]"
+            >
+
               <div className="flex justify-between items-center mb-8">
+
                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
-                  {editingItem ? `Editar Recurso #${editingItem.id}` : 'Registrar Item de Inventario'}
+                  {editingItem
+                    ? `Editar Recurso #${editingItem.id}`
+                    : 'Registrar Item de Inventario'}
                 </h3>
-                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white/5 rounded-full text-text-muted transition-colors"><Plus className="w-6 h-6 rotate-45" /></button>
+
+                <button
+                  onClick={() =>
+                    setShowModal(false)
+                  }
+                  className="p-2 hover:bg-white/5 rounded-full text-text-muted transition-colors"
+                >
+                  <Plus className="w-6 h-6 rotate-45" />
+                </button>
               </div>
-              <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setShowModal(false); }}>
+
+              <form
+                className="space-y-6"
+                onSubmit={handleSubmit}
+              >
+
                 {editingItem && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">ID del Registro (Referencia Back-end)</label>
-                    <input type="text" readOnly value={editingItem.id} className="w-full bg-bg-deep/50 border border-border/50 rounded-2xl px-4 py-3 text-sm text-primary font-mono focus:outline-none cursor-not-allowed" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">
+                      ID del Registro
+                    </label>
+
+                    <input
+                      type="text"
+                      readOnly
+                      value={editingItem.id}
+                      className="w-full bg-bg-deep/50 border border-border/50 rounded-2xl px-4 py-3 text-sm text-primary font-mono"
+                    />
                   </div>
                 )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Nombre del Elemento</label>
-                    <input type="text" defaultValue={editingItem?.element} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="Ej: Cable XLR 5m" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Nombre del Elemento
+                    </label>
+
+                    <input
+                      type="text"
+                      value={element}
+                      onChange={(e) =>
+                        setElement(
+                          e.target.value
+                        )
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="Ej: Cable XLR 5m"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Estado del Elemento</label>
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Estado del Elemento
+                    </label>
+
                     <Combobox
-                      options={elementStatuses.map((status) => ({
-                        id: status.id,
-                        label: status.name || `Estado ${status.id}`,
-                        sublabel: `ID: ${status.id}`
-                      }))}
-                      value={selectedElementStatus}
-                      onChange={(val) => setSelectedElementStatus(val)}
+                      options={elementStatuses.map(
+                        (status) => ({
+                          id: status.id,
+                          label:
+                            status.name ||
+                            `Estado ${status.id}`,
+                          sublabel:
+                            `ID: ${status.id}`
+                        })
+                      )}
+
+                      value={
+                        selectedElementStatus?.toString()
+                      }
+
+                      onChange={(val) => {
+                        setSelectedElementStatus(
+                          Number(val)
+                        );
+                      }}
+
                       placeholder="Seleccionar Estado"
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Precio Unitario ($)</label>
-                    <input type="number" step="0.01" defaultValue={editingItem?.actual_price} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Precio Unitario ($)
+                    </label>
+
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={actualPrice}
+                      onChange={(e) =>
+                        setActualPrice(
+                          e.target.value
+                        )
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Precio sugerido ($)</label>
-                    <input type="number" step="0.01" defaultValue={editingItem?.suggested_price} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Stock Actual
+                    </label>
+
+                    <input
+                      type="number"
+                      value={stockActual}
+                      onChange={(e) =>
+                        setStockActual(
+                          e.target.value
+                        )
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Stock Actual</label>
-                    <input type="number" defaultValue={editingItem?.stock_actual} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Stock de Alerta
+                    </label>
+
+                    <input
+                      type="number"
+                      value={stockAlert}
+                      onChange={(e) =>
+                        setStockAlert(
+                          e.target.value
+                        )
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Stock de Alerta</label>
-                    <input type="number" defaultValue={editingItem?.stock_alert} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Estado Inicial</label>
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Estado Inicial
+                    </label>
+
                     <Combobox
                       options={[
-                        { id: '1', label: 'Nuevo', sublabel: 'EXCELENTE' },
-                        { id: '2', label: 'Usado', sublabel: 'FUNCIONAL' },
-                        { id: '3', label: 'Reparación', sublabel: 'PENDIENTE' }
+                        {
+                          id: '1',
+                          label: 'Nuevo',
+                          sublabel: 'EXCELENTE'
+                        },
+                        {
+                          id: '2',
+                          label: 'Usado',
+                          sublabel: 'FUNCIONAL'
+                        },
+                        {
+                          id: '3',
+                          label: 'Reparación',
+                          sublabel: 'PENDIENTE'
+                        }
                       ]}
-                      value={editingItem?.e_condition?.toString()}
-                      onChange={(val) => { }}
+
+                      value={
+                        selectedCondition?.toString()
+                      }
+
+                      onChange={(val) =>
+                        setSelectedCondition(
+                          Number(val)
+                        )
+                      }
+
                       placeholder="Estado del Item"
                     />
                   </div>
+
                 </div>
+
                 <div className="pt-6">
-                  <button type="submit" className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[0.98] transition-all">
-                    {editingItem ? 'Guardar Cambios' : 'Registrar en Base de Datos'}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[0.98] transition-all"
+                  >
+                    {editingItem
+                      ? 'Guardar Cambios'
+                      : 'Registrar en Base de Datos'}
                   </button>
                 </div>
+
               </form>
             </motion.div>
           </div>
@@ -801,17 +1160,26 @@ function InventoryList() {
       </AnimatePresence>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
         {inventory.map((item) => (
           <motion.div
             key={item.id}
             className="group relative bg-bg-surface rounded-[28px] border border-border hover:border-primary/50 transition-all p-7 overflow-hidden"
           >
+
             <div className="flex justify-between items-start mb-6">
+
               <div className="p-3.5 rounded-2xl bg-bg-deep border border-border text-primary">
                 <Boxes className="w-6 h-6" />
               </div>
 
-              <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${item.stock_actual <= item.stock_alert ? 'text-warning bg-warning/10 border-warning/20' : 'text-success bg-success/10 border-success/20'}`}>
+              <span
+                className={`text-[10px] font-black px-3 py-1 rounded-full border ${item.stock_actual <=
+                  item.stock_alert
+                  ? 'text-warning bg-warning/10 border-warning/20'
+                  : 'text-success bg-success/10 border-success/20'
+                  }`}
+              >
                 STOCK: {item.stock_actual}
               </span>
             </div>
@@ -825,72 +1193,251 @@ function InventoryList() {
             </p>
 
             <p className="text-xs text-text-muted mb-5">
-              Precio actual: ${item.actual_price}
+              Precio actual: $
+              {item.actual_price}
             </p>
 
-            <div className="h-1.5 w-full bg-bg-deep rounded-full overflow-hidden border border-border/50 mb-6">
-              <motion.div
-                initial={{ width: 0 }}
-                whileInView={{
-                  width: `${Math.min((item.stock_actual / (item.stock_alert || 1)) * 50, 100)}%`,
-                }}
-                className={`h-full ${item.stock_actual <= item.stock_alert ? 'bg-warning' : 'bg-primary'}`}
-              />
-            </div>
-
             <div className="grid grid-cols-2 gap-3 pt-5 border-t border-border/40">
+
               <div className="bg-bg-deep/60 p-3 rounded-xl border border-border/50 text-center">
-                <p className="text-[9px] font-black text-text-muted uppercase tracking-tighter">Mínimo</p>
-                <p className="text-sm font-bold text-white">{item.stock_alert}</p>
+
+                <p className="text-[9px] font-black text-text-muted uppercase tracking-tighter">
+                  Mínimo
+                </p>
+
+                <p className="text-sm font-bold text-white">
+                  {item.stock_alert}
+                </p>
               </div>
 
               <div className="bg-bg-deep/60 p-3 rounded-xl border border-border/50 text-center">
-                <p className="text-[9px] font-black text-text-muted uppercase tracking-tighter">Actual</p>
-                <p className="text-sm font-bold text-white">{item.stock_actual}</p>
+
+                <p className="text-[9px] font-black text-text-muted uppercase tracking-tighter">
+                  Actual
+                </p>
+
+                <p className="text-sm font-bold text-white">
+                  {item.stock_actual}
+                </p>
               </div>
+
             </div>
 
-            {/* Acciones flotantes para que siempre sean visibles al hover */}
             <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all z-10 translate-x-4 group-hover:translate-x-0">
-              <button onClick={() => handleEdit(item)} className="p-2 bg-bg-surface border border-border rounded-xl text-text-muted hover:text-primary hover:border-primary/50 transition-all shadow-xl">
+
+              <button
+                onClick={() =>
+                  handleEdit(item)
+                }
+                className="p-2 bg-bg-surface border border-border rounded-xl text-text-muted hover:text-primary hover:border-primary/50 transition-all shadow-xl"
+              >
                 <Edit className="w-4 h-4" />
               </button>
-              <button className="p-2 bg-bg-surface border border-border rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-xl">
+
+              <button
+                onClick={() =>
+                  handleDelete(item.id)
+                }
+                className="p-2 bg-bg-surface border border-border rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-xl"
+              >
                 <Trash2 className="w-4 h-4" />
               </button>
+
             </div>
           </motion.div>
         ))}
+
       </div>
     </div>
   );
 }
 
 // ─── EMPLEADOS ──────────────────────────────────────────────────────────────
-
 function EmployeeList() {
   const [employees, setEmployees] = useState<any[]>([]);
+  const [workstations, setWorkstations] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [showModal, setShowModal] = useState(false);
+
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+
   const [selectedProfile, setSelectedProfile] = useState<Employee | null>(null);
 
+  const [fullname, setFullname] = useState('');
+  const [nationalId, setNationalId] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+
+  const [selectedWorkstation, setSelectedWorkstation] = useState<number | undefined>();
+  const [selectedUser, setSelectedUser] = useState<number | undefined>();
+
+  const [employmentDate, setEmploymentDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+
+  function ProfileField({ label, value }: { label: string; value: string | number }) {
+    return (
+      <div className="bg-bg-deep/40 p-4 rounded-2xl border border-border/50">
+        <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1">
+          {label}
+        </p>
+
+        <p className="text-sm font-bold text-white">
+          {value}
+        </p>
+      </div>
+    );
+  }
   useEffect(() => {
-    employeesAPI.getAll()
-      .then(setEmployees)
+    Promise.all([
+      employeesAPI.getAll(),
+      workstationsAPI.getAll(),
+      usersAPI.getAll()
+    ])
+      .then(([employeesData, workstationsData, usersData]) => {
+        setEmployees(employeesData);
+        setWorkstations(workstationsData);
+        setUsers(usersData);
+      })
       .catch(() => setError('No se pudieron cargar los empleados.'))
       .finally(() => setLoading(false));
   }, []);
 
+  const resetForm = () => {
+    setFullname('');
+    setNationalId('');
+    setEmail('');
+    setPhone('');
+
+    setSelectedWorkstation(undefined);
+    setSelectedUser(undefined);
+
+    setEmploymentDate(
+      new Date().toISOString().split('T')[0]
+    );
+  };
+
   const handleEdit = (emp: Employee) => {
     setEditingEmployee(emp);
+
+    setFullname(emp.fullname || '');
+    setNationalId(emp.national_id || '');
+    setEmail(emp.email || '');
+    setPhone(emp.phone || '');
+
+    setSelectedWorkstation(
+      emp.workstation
+        ? Number(emp.workstation)
+        : undefined
+    );
+
+    setSelectedUser(
+      emp.assigned_user
+        ? Number(emp.assigned_user)
+        : undefined
+    );
+
+    setEmploymentDate(
+      emp.employment_date
+        ? new Date(emp.employment_date)
+          .toISOString()
+          .split('T')[0]
+        : new Date().toISOString().split('T')[0]
+    );
+
     setShowModal(true);
   };
 
   const handleCreate = () => {
     setEditingEmployee(null);
+
+    resetForm();
+
     setShowModal(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    const confirmed = window.confirm(
+      '¿Seguro que deseas eliminar este empleado?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await employeesAPI.delete(id);
+
+      setEmployees((prev) =>
+        prev.filter((emp) => emp.id !== id)
+      );
+    } catch (err) {
+      console.error(err);
+
+      alert('No se pudo eliminar el empleado.');
+    }
+  };
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+
+    const payload = {
+      fullname,
+      national_id: nationalId,
+      email,
+      phone,
+
+      workstation: selectedWorkstation,
+
+      assigned_user: selectedUser,
+
+      employment_date: employmentDate
+    };
+
+    try {
+
+      if (editingEmployee) {
+
+        await employeesAPI.update(
+          editingEmployee.id,
+          payload
+        );
+
+        setEmployees((prev) =>
+          prev.map((emp) =>
+            emp.id === editingEmployee.id
+              ? {
+                ...emp,
+                ...payload
+              }
+              : emp
+          )
+        );
+
+      } else {
+
+        const created =
+          await employeesAPI.create(payload);
+
+        setEmployees((prev) => [
+          ...prev,
+          created
+        ]);
+      }
+
+      setShowModal(false);
+
+      resetForm();
+
+    } catch (err) {
+      console.error(err);
+
+      alert('No se pudo guardar el empleado.');
+    }
   };
 
   if (loading) return <LoadingSpinner />;
@@ -898,77 +1445,233 @@ function EmployeeList() {
 
   return (
     <div className="space-y-8">
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+
         <div>
-          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Gestión de Personal</h2>
-          <p className="text-sm text-text-muted font-medium italic">Talento humano y asignaciones de K-DAILY.</p>
+          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">
+            Gestión de Personal
+          </h2>
+
+          <p className="text-sm text-text-muted font-medium italic">
+            Talento humano y asignaciones de K-DAILY.
+          </p>
         </div>
+
         <button
           onClick={handleCreate}
           className="bg-primary text-white px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 flex items-center gap-2 hover:scale-95 transition-all"
         >
-          <Plus className="w-4 h-4" /> Nuevo Empleado
+          <Plus className="w-4 h-4" />
+          Nuevo Empleado
         </button>
       </div>
 
       <AnimatePresence>
+
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-bg-surface border border-border w-full max-w-2xl rounded-[32px] shadow-2xl p-8 overflow-y-auto max-h-[90vh]">
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-bg-surface border border-border w-full max-w-2xl rounded-[32px] shadow-2xl p-8 overflow-y-auto max-h-[90vh]"
+            >
+
               <div className="flex justify-between items-center mb-8">
+
                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
-                  {editingEmployee ? `Editar Empleado #${editingEmployee.id}` : 'Registrar Nuevo Empleado'}
+                  {editingEmployee
+                    ? `Editar Empleado #${editingEmployee.id}`
+                    : 'Registrar Nuevo Empleado'}
                 </h3>
-                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white/5 rounded-full text-text-muted transition-colors"><Plus className="w-6 h-6 rotate-45" /></button>
+
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="p-2 hover:bg-white/5 rounded-full text-text-muted transition-colors"
+                >
+                  <Plus className="w-6 h-6 rotate-45" />
+                </button>
               </div>
-              <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setShowModal(false); }}>
+
+              <form
+                className="space-y-6"
+                onSubmit={handleSubmit}
+              >
+
                 {editingEmployee && (
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">ID del Registro (Referencia Back-end)</label>
-                    <input type="text" readOnly value={editingEmployee.id} className="w-full bg-bg-deep/50 border border-border/50 rounded-2xl px-4 py-3 text-sm text-primary font-mono focus:outline-none cursor-not-allowed" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">
+                      ID del Registro
+                    </label>
+
+                    <input
+                      type="text"
+                      readOnly
+                      value={editingEmployee.id}
+                      className="w-full bg-bg-deep/50 border border-border/50 rounded-2xl px-4 py-3 text-sm text-primary font-mono"
+                    />
                   </div>
                 )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Nombre Completo</label>
-                    <input type="text" defaultValue={editingEmployee?.fullname} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="Juan Perez" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Nombre Completo
+                    </label>
+
+                    <input
+                      type="text"
+                      value={fullname}
+                      onChange={(e) =>
+                        setFullname(e.target.value)
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="Juan Perez"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Cédula / ID Nacional</label>
-                    <input type="text" className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="000-0000000-0" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Cédula / ID Nacional
+                    </label>
+
+                    <input
+                      type="text"
+                      value={nationalId}
+                      onChange={(e) =>
+                        setNationalId(e.target.value)
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="000-0000000-0"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Correo Electrónico</label>
-                    <input type="email" className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="email@ejemplo.com" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Correo Electrónico
+                    </label>
+
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) =>
+                        setEmail(e.target.value)
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="email@ejemplo.com"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Teléfono</label>
-                    <input type="tel" className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="809-000-0000" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Teléfono
+                    </label>
+
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) =>
+                        setPhone(e.target.value)
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="809-000-0000"
+                    />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Puesto (Workstation)</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Puesto (Workstation)
+                    </label>
+
                     <Combobox
-                      options={[
-                        { id: '1', label: 'Logística', sublabel: 'OPERATIVO' },
-                        { id: '2', label: 'Ventas', sublabel: 'COMERCIAL' },
-                        { id: '3', label: 'Administración', sublabel: 'OFICINA' }
-                      ]}
-                      value={editingEmployee?.workstation?.toString()}
-                      onChange={(val) => { }}
+                      options={workstations.map((w) => ({
+                        id: w.id,
+                        label: w.title,
+                        sublabel: `ID: ${w.id}`
+                      }))}
+
+                      value={
+                        selectedWorkstation?.toString()
+                      }
+
+                      onChange={(val) => {
+                        setSelectedWorkstation(
+                          Number(val)
+                        );
+                      }}
+
                       placeholder="Seleccionar Puesto"
                     />
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Fecha de Contratación</label>
-                    <input type="date" defaultValue={editingEmployee?.hiring_date ? new Date(editingEmployee.hiring_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Usuario Asignado
+                    </label>
+
+                    <Combobox
+                      options={users.map((u) => ({
+                        id: u.id,
+                        label: u.username,
+                        sublabel: `ID: ${u.id}`
+                      }))}
+
+                      value={
+                        selectedUser?.toString()
+                      }
+
+                      onChange={(val) => {
+                        setSelectedUser(
+                          Number(val)
+                        );
+                      }}
+
+                      placeholder="Seleccionar Usuario"
+                    />
                   </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Fecha de Contratación
+                    </label>
+
+                    <input
+                      type="date"
+                      value={employmentDate}
+                      onChange={(e) =>
+                        setEmploymentDate(
+                          e.target.value
+                        )
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                    />
+                  </div>
+
                 </div>
+
                 <div className="pt-6">
-                  <button type="submit" className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[0.98] transition-all">
-                    {editingEmployee ? 'Actualizar Datos' : 'Vincular al Equipo'}
+                  <button
+                    type="submit"
+                    className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[0.98] transition-all"
+                  >
+                    {editingEmployee
+                      ? 'Actualizar Datos'
+                      : 'Vincular al Equipo'}
                   </button>
                 </div>
+
               </form>
             </motion.div>
           </div>
@@ -976,13 +1679,37 @@ function EmployeeList() {
 
         {selectedProfile && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSelectedProfile(null)} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }} className="relative bg-bg-surface border border-border w-full max-w-xl rounded-[40px] shadow-2xl p-10 overflow-hidden">
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedProfile(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+              className="relative bg-bg-surface border border-border w-full max-w-xl rounded-[40px] shadow-2xl p-10 overflow-hidden"
+            >
+
               <div className="flex flex-col items-center text-center">
+
                 <div className="w-32 h-32 rounded-full bg-bg-deep border-[8px] border-bg-surface shadow-2xl mb-6 flex items-center justify-center text-4xl font-black text-primary">
-                  {selectedProfile.fullname.split(' ').map(n => n[0]).join('')}
+                  {selectedProfile.fullname
+                    ? selectedProfile.fullname
+                      .split(' ')
+                      .map((n: string) => n[0])
+                      .join('')
+                    : ''}
                 </div>
-                <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-1">{selectedProfile.fullname}</h3>
+
+                <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-1">
+                  {selectedProfile.fullname}
+                </h3>
+
                 <div className="text-[10px] font-black text-primary uppercase tracking-widest mb-8 px-4 py-1.5 bg-primary/10 rounded-full border border-primary/20">
                   ID Empleado #{selectedProfile.id}
                 </div>
@@ -990,46 +1717,72 @@ function EmployeeList() {
                 <div className="w-full grid grid-cols-2 gap-4 text-left">
                   <ProfileField label="Workstation" value={selectedProfile.workstation} />
                   <ProfileField label="Usuario Asignado" value={selectedProfile.assigned_user || "Sin asignar"} />
-                  <ProfileField label="Contratación" value={new Date(selectedProfile.hiring_date).toLocaleDateString()} />
+                  <ProfileField label="Contratación" value={new Date(selectedProfile.employment_date).toLocaleDateString()} />
                   <ProfileField label="Estado" value="Activo" />
                 </div>
 
                 <div className="w-full mt-10 pt-10 border-t border-border flex justify-center gap-6">
+
                   <button className="flex flex-col items-center gap-2 group">
                     <div className="p-4 rounded-2xl bg-bg-deep border border-border group-hover:bg-primary group-hover:border-primary transition-all group-hover:text-white text-text-muted">
                       <Mail className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-text-muted group-hover:text-white transition-colors">Email</span>
+
+                    <span className="text-[10px] font-black uppercase tracking-widest text-text-muted group-hover:text-white transition-colors">
+                      Email
+                    </span>
                   </button>
+
                   <button className="flex flex-col items-center gap-2 group">
                     <div className="p-4 rounded-2xl bg-bg-deep border border-border group-hover:bg-primary group-hover:border-primary transition-all group-hover:text-white text-text-muted">
                       <Phone className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-text-muted group-hover:text-white transition-colors">Llamar</span>
+
+                    <span className="text-[10px] font-black uppercase tracking-widest text-text-muted group-hover:text-white transition-colors">
+                      Llamar
+                    </span>
                   </button>
+
                 </div>
 
-                <button onClick={() => setSelectedProfile(null)} className="mt-12 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted hover:text-white hover:underline transition-all">Cerrar Perfil</button>
+                <button
+                  onClick={() => setSelectedProfile(null)}
+                  className="mt-12 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted hover:text-white hover:underline transition-all"
+                >
+                  Cerrar Perfil
+                </button>
+
               </div>
             </motion.div>
           </div>
         )}
+
       </AnimatePresence>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+
         {employees.map((emp) => (
           <motion.div
             key={emp.id}
             whileHover={{ y: -10 }}
             className="group bg-bg-surface rounded-[35px] border border-border hover:border-primary/40 transition-all overflow-hidden shadow-lg"
           >
+
             <div className="p-8 text-center flex flex-col items-center">
+
               <div className="w-20 h-20 rounded-full bg-bg-deep border-[4px] border-bg-surface flex items-center justify-center text-2xl font-black text-primary transition-transform group-hover:scale-110 mb-5 shadow-inner">
-                {emp.fullname.split(' ').map((n: string) => n[0]).join('')}
+                {emp.fullname
+                  ? emp.fullname.split(' ').map((n: string) => n[0]).join('')
+                  : ''}
               </div>
 
-              <h3 className="text-lg font-bold text-white mb-1 truncate w-full">{emp.fullname}</h3>
-              <p className="text-[9px] font-black text-primary uppercase tracking-[0.15em] mb-6">Puesto ID: {emp.workstation}</p>
+              <h3 className="text-lg font-bold text-white mb-1 truncate w-full">
+                {emp.fullname}
+              </h3>
+
+              <p className="text-[9px] font-black text-primary uppercase tracking-[0.15em] mb-6">
+                {emp.workstation}
+              </p>
 
               <button
                 onClick={() => setSelectedProfile(emp)}
@@ -1040,29 +1793,29 @@ function EmployeeList() {
             </div>
 
             <div className="bg-black/20 py-3 flex justify-center gap-4 border-t border-border opacity-0 group-hover:opacity-100 transition-all">
-              <button onClick={() => handleEdit(emp)} className="p-2 text-text-muted hover:text-primary transition-colors">
+
+              <button
+                onClick={() => handleEdit(emp)}
+                className="p-2 text-text-muted hover:text-primary transition-colors"
+              >
                 <Edit className="w-4 h-4" />
               </button>
-              <button className="p-2 text-text-muted hover:text-red-400 transition-colors">
+
+              <button
+                onClick={() => handleDelete(emp.id)}
+                className="p-2 text-text-muted hover:text-red-400 transition-colors"
+              >
                 <Trash2 className="w-4 h-4" />
               </button>
+
             </div>
           </motion.div>
         ))}
+
       </div>
     </div>
   );
 }
-
-function ProfileField({ label, value }: { label: string, value: string | number }) {
-  return (
-    <div className="bg-bg-deep/40 p-4 rounded-2xl border border-border/50">
-      <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-1">{label}</p>
-      <p className="text-sm font-bold text-white">{value}</p>
-    </div>
-  );
-}
-
 // ─── CLIENTES ───────────────────────────────────────────────────────────────
 
 function ClientList() {

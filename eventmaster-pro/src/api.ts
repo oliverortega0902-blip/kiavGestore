@@ -61,11 +61,11 @@ export const eventStatusAPI = {
 
 // ============ INVENTORY API ============
 export const inventoryAPI = {
-  getAll:    ()              => fetchAPI('/inventory'),
-  getById:   (id: number)   => fetchAPI(`/inventory/${id}`),
-  create:    (data: any)    => fetchAPI('/inventory', { method: 'POST', body: JSON.stringify(data) }),
-  update:    (id: number, data: any) => fetchAPI(`/inventory/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete:    (id: number)   => fetchAPI(`/inventory/${id}`, { method: 'DELETE' }),
+  getAll: () => fetchAPI('/inventory'),
+  getById: (id: number) => fetchAPI(`/inventory/${id}`),
+  create: (data: any) => fetchAPI('/inventory/create', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: any) => fetchAPI('/inventory/edit', { method: 'PUT', body: JSON.stringify({id, ...data})}),
+  delete: (id: number) => fetchAPI(`/inventory/${id}`, { method: 'DELETE' }),
   getAlerts: ()              => fetchAPI('/inventoryAlerts'),  // ← guión → camelCase
 };
 
@@ -82,11 +82,29 @@ export const elementStatusAPI = {
 //---------------------------------------------EMPLEADOS---------------------------------------------//
 // ============ EMPLOYEES API ============
 export const employeesAPI = {
-  getAll:    ()              => fetchAPI('/employees'),
-  getById:   (id: number)   => fetchAPI(`/employees/${id}`),
-  create:    (data: any)    => fetchAPI('/employees', { method: 'POST', body: JSON.stringify(data) }),
-  update:    (id: number, data: any) => fetchAPI(`/employees/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete:    (id: number)   => fetchAPI(`/employees/${id}`, { method: 'DELETE' }),
+  getAll: () => fetchAPI('/employees'),
+  getById: (id: number) => fetchAPI(`/employees/${id}`),
+  create: (data: any) => fetchAPI('/employees/create', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: any) => fetchAPI('/employees/edit', { method: 'PUT', body: JSON.stringify({ id, ...data }) }),
+  delete: (id: number) => fetchAPI(`/employees/${id}`, { method: 'DELETE' }),
+};
+
+// ============ WORKSTATIONS API ============
+export const workstationsAPI = {
+  getAll: () => fetchAPI('/workstations'),
+  getById: (id: number) => fetchAPI(`/workstations/${id}`),
+  create: (data: any) => fetchAPI('/workstations/create', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: any) => fetchAPI('/workstations/edit', { method: 'PUT', body: JSON.stringify({ id, ...data }) }),
+  delete: (id: number) => fetchAPI(`/workstations/${id}`, { method: 'DELETE' }),
+};
+
+// ============ USERS API ============
+export const usersAPI = {
+  getAll: () => fetchAPI('/users'),
+  getById: (id: number) => fetchAPI(`/users/${id}`),
+  create: (data: any) => fetchAPI('/users/create', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: any) => fetchAPI('/users/edit', { method: 'PUT', body: JSON.stringify({ id, ...data }) }),
+  delete: (id: number) => fetchAPI(`/users/${id}`, { method: 'DELETE' }),
 };
 
 // ============ CLIENTS API ============
