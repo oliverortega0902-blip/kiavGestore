@@ -7,7 +7,7 @@ const headers = {
 
 async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   try {
     const response = await fetch(url, {
       ...options,
@@ -31,29 +31,29 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 //---------------------------------------------EVENTOS/---------------------------------------------//
 // ============ EVENTS API ============
 export const eventsAPI = {
-  getAll:    ()              => fetchAPI('/eventServices'),
-  getById:   (id: number)   => fetchAPI(`/eventServices/${id}`),
-  create:    (data: any)    => fetchAPI('/eventServices', { method: 'POST', body: JSON.stringify(data) }),
-  update:    (id: number, data: any) => fetchAPI(`/eventServices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete:    (id: number)   => fetchAPI(`/eventServices/${id}`, { method: 'DELETE' }),
+  getAll: () => fetchAPI('/eventServices'),
+  getById: (id: number) => fetchAPI(`/eventServices/${id}`),
+  create: (data: any) => fetchAPI('/eventServices', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: any) => fetchAPI(`/eventServices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/eventServices/${id}`, { method: 'DELETE' }),
 };
 
 // ============ TIPOS DE EVENTOS API ============
 export const eventTypesAPI = {
-  getAll:    ()              => fetchAPI('/eventTypes'),
-  getById:   (id: number)   => fetchAPI(`/eventTypes/${id}`),
-  create:    (data: any)    => fetchAPI('/eventTypes', { method: 'POST', body: JSON.stringify(data) }),
-  update:    (id: number, data: any) => fetchAPI(`/eventTypes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete:    (id: number)   => fetchAPI(`/eventTypes/${id}`, { method: 'DELETE' }),
+  getAll: () => fetchAPI('/eventTypes'),
+  getById: (id: number) => fetchAPI(`/eventTypes/${id}`),
+  create: (data: any) => fetchAPI('/eventTypes', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: any) => fetchAPI(`/eventTypes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/eventTypes/${id}`, { method: 'DELETE' }),
 };
 
 // ============ STATUS DE EVENTOS ============
 export const eventStatusAPI = {
-  getAll:    ()              => fetchAPI('/eventStatus'),
-  getById:   (id: number)   => fetchAPI(`/eventStatus/${id}`),
-  create:    (data: any)    => fetchAPI('/eventStatus/create', { method: 'POST', body: JSON.stringify(data) }),
-  update:    (data: any)    => fetchAPI('/eventStatus/edit', { method: 'PUT', body: JSON.stringify(data) }),
-  delete:    (id: number)   => fetchAPI(`/eventStatus/${id}`, { method: 'DELETE' }),
+  getAll: () => fetchAPI('/eventStatus'),
+  getById: (id: number) => fetchAPI(`/eventStatus/${id}`),
+  create: (data: any) => fetchAPI('/eventStatus/create', { method: 'POST', body: JSON.stringify(data) }),
+  update: (data: any) => fetchAPI('/eventStatus/edit', { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/eventStatus/${id}`, { method: 'DELETE' }),
 };
 
 
@@ -64,18 +64,18 @@ export const inventoryAPI = {
   getAll: () => fetchAPI('/inventory'),
   getById: (id: number) => fetchAPI(`/inventory/${id}`),
   create: (data: any) => fetchAPI('/inventory/create', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: any) => fetchAPI('/inventory/edit', { method: 'PUT', body: JSON.stringify({id, ...data})}),
+  update: (id: number, data: any) => fetchAPI('/inventory/edit', { method: 'PUT', body: JSON.stringify({ id, ...data }) }),
   delete: (id: number) => fetchAPI(`/inventory/${id}`, { method: 'DELETE' }),
-  getAlerts: ()              => fetchAPI('/inventoryAlerts'),  // ← guión → camelCase
+  getAlerts: () => fetchAPI('/inventoryAlerts'),  // ← guión → camelCase
 };
 
 // ============ element STATUS API ============
 export const elementStatusAPI = {
-  getAll:    ()              => fetchAPI('/elementStatus'),
-  getById:   (id: number)   => fetchAPI(`/elementStatus/${id}`),
-  create:    (data: any)    => fetchAPI('/elementStatus', { method: 'POST', body: JSON.stringify(data) }),
-  update:    (id: number, data: any) => fetchAPI(`/elementStatus/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete:    (id: number)   => fetchAPI(`/elementStatus/${id}`, { method: 'DELETE' }),
+  getAll: () => fetchAPI('/elementStatus'),
+  getById: (id: number) => fetchAPI(`/elementStatus/${id}`),
+  create: (data: any) => fetchAPI('/elementStatus', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: any) => fetchAPI(`/elementStatus/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) => fetchAPI(`/elementStatus/${id}`, { method: 'DELETE' }),
 };
 
 
@@ -107,21 +107,85 @@ export const usersAPI = {
   delete: (id: number) => fetchAPI(`/users/${id}`, { method: 'DELETE' }),
 };
 
+
+//---------------------------------------------Clientes---------------------------------------------//
+
 // ============ CLIENTS API ============
 export const clientsAPI = {
-  getAll:    ()              => fetchAPI('/clients'),
-  getById:   (id: number)   => fetchAPI(`/clients/${id}`),
-  create:    (data: any)    => fetchAPI('/clients', { method: 'POST', body: JSON.stringify(data) }),
-  update:    (id: number, data: any) => fetchAPI(`/clients/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete:    (id: number)   => fetchAPI(`/clients/${id}`, { method: 'DELETE' }),
+  getAll: () => fetchAPI('/clients'),
+  getById: (id: number) => fetchAPI(`/clients/${id}`),
+  create: (data: any) => fetchAPI('/clients/create', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: number, data: any) => fetchAPI('/clients/edit', { method: 'PUT', body: JSON.stringify({ id, ...data }) }),
+  delete: (id: number) => fetchAPI(`/clients/${id}`, { method: 'DELETE' }),
 };
+
+// ============ CLIENT TYPES API ============
+export const clientTypesAPI = {
+  getAll: () => fetchAPI('/clientTypes'),
+  getById: (id: number) => fetchAPI(`/clientTypes/${id}`),
+  create: (data: any) => fetchAPI('/clientTypes/create', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }),
+  update: (data: any) => fetchAPI('/clientTypes/edit', {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  }),
+  delete: (id: number) => fetchAPI(`/clientTypes/${id}`, {
+    method: 'DELETE'
+  }),
+};
+
+//---------------------------------------------ingresos---------------------------------------------//
 
 // ============ INVOICES API ============
 export const invoicesAPI = {
-  getAll:    ()              => fetchAPI('/bills'),
-  getById:   (id: string)   => fetchAPI(`/bills/${id}`),
-  create:    (data: any)    => fetchAPI('/bills', { method: 'POST', body: JSON.stringify(data) }),
-  update:    (id: string, data: any) => fetchAPI(`/bills/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete:    (id: string)   => fetchAPI(`/bills/${id}`, { method: 'DELETE' }),
+  getAll: () =>
+    fetchAPI('/bills'),
+
+  getById: (id: number) =>
+    fetchAPI(`/bills/${id}`),
+
+  create: (data: any) =>
+    fetchAPI('/bills/create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (data: any) =>
+    fetchAPI('/bills/edit', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: number) =>
+    fetchAPI(`/bills/${id}`, {
+      method: 'DELETE',
+    }),
 };
 
+
+export const paymentMethodsAPI = {
+  getAll: () =>
+    fetchAPI('/paymentMethods'),
+
+  getById: (id: number) =>
+    fetchAPI(`/paymentMethods/${id}`),
+
+  create: (data: any) =>
+    fetchAPI('/paymentMethods/create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (data: any) =>
+    fetchAPI('/paymentMethods/edit', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: number) =>
+    fetchAPI(`/paymentMethods/${id}`, {
+      method: 'DELETE',
+    }),
+};

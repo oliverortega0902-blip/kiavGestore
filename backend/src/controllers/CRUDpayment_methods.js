@@ -73,7 +73,7 @@ export const getAllPaymentMethods = async (req, res) => {
     const pool = getPool();
 
     const result = await pool.request()
-      .query("SELECT * FROM vw_payment_methods ORDER BY name");
+      .query("SELECT * FROM vw_payment_methods ORDER BY payment_type");
 
     res.json(result.recordset);
 

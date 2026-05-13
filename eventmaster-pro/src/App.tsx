@@ -7,8 +7,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
-import { eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI } from './api';
-import { MOCK_BILLS } from './constants';
+import {
+  eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI,
+  clientTypesAPI, paymentMethodsAPI
+} from './api';
 
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>('events');
@@ -1252,7 +1254,7 @@ function InventoryList() {
   );
 }
 
-// ─── EMPLEADOS ──────────────────────────────────────────────────────────────
+// ─── EMPLEADOS ────────────────────────────────────────────────────────────── NO TOOCAR NUNCAAAAAA!!!!!
 function EmployeeList() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [workstations, setWorkstations] = useState<any[]>([]);
@@ -1816,30 +1818,178 @@ function EmployeeList() {
     </div>
   );
 }
-// ─── CLIENTES ───────────────────────────────────────────────────────────────
-
+// ─── CLIENTES ─────────────────────────────────────────────────────────────── no tocar tampoco, es sagrado este componente, si lo tocas se muere un gatito :c
 function ClientList() {
+
   const [clients, setClients] = useState<any[]>([]);
+  const [clientTypes, setClientTypes] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [showModal, setShowModal] = useState(false);
+
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
+  const [fullname, setFullname] = useState('');
+  const [nationalId, setNationalId] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+
+  const [selectedKind, setSelectedKind] = useState<number | undefined>();
+
   useEffect(() => {
-    clientsAPI.getAll()
-      .then(setClients)
+
+    Promise.all([
+      clientsAPI.getAll(),
+      clientTypesAPI.getAll()
+    ])
+      .then(([clientsData, typesData]) => {
+
+        const mappedClients = clientsData.map((client: any) => ({
+          ...client,
+          kind_name:
+            typesData.find(
+              (t: any) => t.id === client.kind
+            )?.name || client.kind
+        }));
+
+        setClients(mappedClients);
+
+        setClientTypes(typesData);
+      })
       .catch(() => setError('No se pudieron cargar los clientes.'))
       .finally(() => setLoading(false));
+
   }, []);
 
+  const resetForm = () => {
+
+    setFullname('');
+    setNationalId('');
+    setEmail('');
+    setPhone('');
+
+    setSelectedKind(undefined);
+  };
+
   const handleEdit = (client: Client) => {
+
     setEditingClient(client);
+
+    setFullname(client.fullname || '');
+    setNationalId(client.national_id || '');
+    setEmail(client.email || '');
+    setPhone(client.phone || '');
+
+    setSelectedKind(
+      client.kind
+        ? Number(client.kind)
+        : undefined
+    );
+
     setShowModal(true);
   };
 
   const handleCreate = () => {
+
     setEditingClient(null);
+
+    resetForm();
+
     setShowModal(true);
+  };
+
+  const handleDelete = async (id: number) => {
+
+    const confirmed = window.confirm(
+      '¿Seguro que deseas eliminar este cliente?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+
+      await clientsAPI.delete(id);
+
+      setClients((prev) =>
+        prev.filter((client) => client.id !== id)
+      );
+
+    } catch (err) {
+
+      console.error(err);
+
+      alert('No se pudo eliminar el cliente.');
+    }
+  };
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+
+    e.preventDefault();
+
+    const payload = {
+      id: editingClient?.id,
+      fullname,
+      national_id: nationalId,
+      kind: selectedKind,
+      email,
+      phone
+    };
+
+    try {
+
+      if (editingClient) {
+
+        await clientsAPI.update(editingClient.id, payload);
+        const typeName =
+          clientTypes.find(
+            (t) => t.id === selectedKind
+          )?.name || selectedKind;
+
+        setClients((prev) =>
+          prev.map((client) =>
+            client.id === editingClient.id
+              ? {
+                ...client,
+                ...payload,
+                kind_name: typeName
+              }
+              : client
+          )
+        );
+
+      } else {
+
+        const created =
+          await clientsAPI.create(payload);
+
+        const typeName =
+          clientTypes.find(
+            (t) => t.id === selectedKind
+          )?.name || selectedKind;
+
+        setClients((prev) => [
+          ...prev,
+          {
+            ...created,
+            kind_name: typeName
+          }
+        ]);
+      }
+
+      setShowModal(false);
+
+      resetForm();
+
+    } catch (err) {
+
+      console.error(err);
+
+      alert('No se pudo guardar el cliente.');
+    }
   };
 
   if (loading) return <LoadingSpinner />;
@@ -1847,94 +1997,236 @@ function ClientList() {
 
   return (
     <div className="space-y-8">
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+
         <div>
-          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">Directorio de Clientes</h2>
-          <p className="text-sm text-text-muted font-medium italic">Relaciones comerciales y corporativas de K-DAILY.</p>
+          <h2 className="text-3xl font-black text-white tracking-tighter uppercase">
+            Directorio de Clientes
+          </h2>
+
+          <p className="text-sm text-text-muted font-medium italic">
+            Relaciones comerciales y corporativas de K-DAILY.
+          </p>
         </div>
+
         <button
           onClick={handleCreate}
           className="bg-primary text-white px-6 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest shadow-xl shadow-primary/20 flex items-center gap-2 hover:scale-95 transition-all"
         >
-          <Plus className="w-4 h-4" /> Registrar Cliente
+          <Plus className="w-4 h-4" />
+          Registrar Cliente
         </button>
+
       </div>
 
       <AnimatePresence>
+
         {showModal && (
+
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-bg-surface border border-border w-full max-w-2xl rounded-[32px] shadow-2xl p-8 overflow-y-auto max-h-[90vh]">
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-bg-surface border border-border w-full max-w-2xl rounded-[32px] shadow-2xl p-8 overflow-y-auto max-h-[90vh]"
+            >
+
               <div className="flex justify-between items-center mb-8">
+
                 <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
-                  {editingClient ? `Editar Cliente #${editingClient.id}` : 'Registrar Nuevo Cliente'}
+                  {editingClient
+                    ? `Editar Cliente #${editingClient.id}`
+                    : 'Registrar Nuevo Cliente'}
                 </h3>
-                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-white/5 rounded-full text-text-muted transition-colors"><Plus className="w-6 h-6 rotate-45" /></button>
+
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="p-2 hover:bg-white/5 rounded-full text-text-muted transition-colors"
+                >
+                  <Plus className="w-6 h-6 rotate-45" />
+                </button>
+
               </div>
-              <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); setShowModal(false); }}>
+
+              <form
+                className="space-y-6"
+                onSubmit={handleSubmit}
+              >
+
                 {editingClient && (
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">ID del Registro (Referencia Back-end)</label>
-                    <input type="text" readOnly value={editingClient.id} className="w-full bg-bg-deep/50 border border-border/50 rounded-2xl px-4 py-3 text-sm text-primary font-mono focus:outline-none cursor-not-allowed" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">
+                      ID del Registro
+                    </label>
+
+                    <input
+                      type="text"
+                      readOnly
+                      value={editingClient.id}
+                      className="w-full bg-bg-deep/50 border border-border/50 rounded-2xl px-4 py-3 text-sm text-primary font-mono"
+                    />
+
                   </div>
                 )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Nombre Completo / Razón Social</label>
-                    <input type="text" defaultValue={editingClient?.fullname} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="TechCorp S.A." />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Nombre Completo / Razón Social
+                    </label>
+
+                    <input
+                      type="text"
+                      value={fullname}
+                      onChange={(e) =>
+                        setFullname(e.target.value)
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="TechCorp S.A."
+                    />
+
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Identificación Nacional (RNC/Cédula)</label>
-                    <input type="text" defaultValue={editingClient?.national_id} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="1-01-12345-6" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Identificación Nacional
+                    </label>
+
+                    <input
+                      type="text"
+                      value={nationalId}
+                      onChange={(e) =>
+                        setNationalId(e.target.value)
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="1-01-12345-6"
+                    />
+
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Tipo de Cliente</label>
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Tipo de Cliente
+                    </label>
+
                     <Combobox
-                      options={[
-                        { id: '1', label: 'Empresa', sublabel: 'CORPORATIVO' },
-                        { id: '2', label: 'Persona Física', sublabel: 'CLIENTE FINAL' }
-                      ]}
-                      value={editingClient?.kind?.toString()}
-                      onChange={(val) => { }}
+                      options={clientTypes.map((type) => ({
+                        id: type.id,
+                        label: type.name,
+                        sublabel: `ID: ${type.id}`
+                      }))}
+
+                      value={selectedKind?.toString()}
+
+                      onChange={(val) => {
+                        setSelectedKind(Number(val));
+                      }}
+
                       placeholder="Tipo de Cliente"
                     />
+
                   </div>
+
                   <div className="space-y-2">
-                    <label className="text-[10px) font-black uppercase tracking-widest text-text-muted ml-1">Correo Electrónico</label>
-                    <input type="email" defaultValue={editingClient?.email} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="contacto@empresa.com" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Correo Electrónico
+                    </label>
+
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) =>
+                        setEmail(e.target.value)
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="contacto@empresa.com"
+                    />
+
                   </div>
+
                   <div className="space-y-2 md:col-span-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">Teléfono</label>
-                    <input type="tel" defaultValue={editingClient?.phone} className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all" placeholder="809-555-0000" />
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Teléfono
+                    </label>
+
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) =>
+                        setPhone(e.target.value)
+                      }
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="809-555-0000"
+                    />
+
                   </div>
+
                 </div>
+
                 <div className="pt-6">
-                  <button type="submit" className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[0.98] transition-all">
-                    {editingClient ? 'Actualizar Cliente' : 'Guardar en CRM'}
+
+                  <button
+                    type="submit"
+                    className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[0.98] transition-all"
+                  >
+                    {editingClient
+                      ? 'Actualizar Cliente'
+                      : 'Guardar en CRM'}
                   </button>
+
                 </div>
+
               </form>
+
             </motion.div>
+
           </div>
         )}
+
       </AnimatePresence>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
         {clients.map((client) => (
+
           <motion.div
             key={client.id}
             whileHover={{ y: -8 }}
             className="group bg-bg-surface rounded-[32px] border border-border hover:border-primary/40 transition-all overflow-hidden"
           >
+
             <div className="p-8">
+
               <div className="flex justify-between items-start mb-8">
+
                 <div className="w-16 h-16 rounded-2xl bg-bg-deep border border-border flex items-center justify-center text-2xl font-black text-primary">
-                  {client.fullname.charAt(0)}
+                  {client.fullname
+                    ? client.fullname.charAt(0)
+                    : ''}
                 </div>
 
                 <span className="text-[9px] font-black uppercase bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full tracking-widest">
-                  {client.kind === 1 ? "EMPRESA" : "PERSONAL"}
+                  {client.kind_name}
                 </span>
+
               </div>
 
               <h3 className="text-xl font-bold text-white mb-1">
@@ -1942,40 +2234,62 @@ function ClientList() {
               </h3>
 
               <div className="flex items-center gap-2 text-[10px] font-black text-text-muted uppercase tracking-widest mb-6">
+
                 <Briefcase className="w-3 h-3 text-primary/60" />
+
                 {client.national_id}
+
               </div>
 
               <div className="space-y-3">
+
                 <div className="flex items-center gap-4 p-4 bg-bg-deep/40 rounded-2xl border border-border/40">
+
                   <Mail className="w-4 h-4 text-primary/40" />
 
                   <p className="text-xs text-white truncate font-medium">
                     {client.email}
                   </p>
+
                 </div>
 
                 <div className="flex items-center gap-4 p-4 bg-bg-deep/40 rounded-2xl border border-border/40">
+
                   <Phone className="w-4 h-4 text-primary/40" />
 
                   <p className="text-xs text-white truncate font-medium">
                     {client.phone}
                   </p>
+
                 </div>
+
               </div>
+
             </div>
 
             <div className="grid grid-cols-2 border-t border-border bg-black/20 opacity-0 group-hover:opacity-100 transition-all">
-              <button onClick={() => handleEdit(client)} className="py-4 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 border-r border-border transition-colors">
+
+              <button
+                onClick={() => handleEdit(client)}
+                className="py-4 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 border-r border-border transition-colors"
+              >
                 Editar
               </button>
-              <button className="py-4 text-[10px] font-black uppercase tracking-widest text-red-400 hover:bg-red-400/5 transition-colors text-center flex items-center justify-center">
+
+              <button
+                onClick={() => handleDelete(client.id)}
+                className="py-4 text-[10px] font-black uppercase tracking-widest text-red-400 hover:bg-red-400/5 transition-colors text-center flex items-center justify-center"
+              >
                 <Trash2 className="w-3" />
               </button>
+
             </div>
+
           </motion.div>
         ))}
+
       </div>
+
     </div>
   );
 }
@@ -2089,23 +2403,146 @@ function FinancesSection({
 }) {
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+  const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null);
+
+  const [clients, setClients] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [clientId, setClientId] = useState<number | undefined>();
+  const [eventId, setEventId] = useState<number | undefined>();
+
+  const [amount, setAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<number | undefined>();
+  const [status, setStatus] = useState('');
+
+  const [paymentDate, setPaymentDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+
+  const [dueDate, setDueDate] = useState('');
+
   useEffect(() => {
-    invoicesAPI.getAll()
-      .then(setInvoices)
-      .catch(() => setError('No se pudieron cargar las facturas.'))
+
+    Promise.all([
+      invoicesAPI.getAll(),
+      clientsAPI.getAll(),
+      eventsAPI.getAll(),
+      paymentMethodsAPI.getAll()
+    ])
+      .then(([invoicesData, clientsData, eventsData, paymentMethodsData]) => {
+
+        setInvoices(invoicesData || []);
+        setClients(clientsData || []);
+        setEvents(eventsData || []);
+        setPaymentMethods(paymentMethodsData || []);
+
+      })
+      .catch(() =>
+        setError('No se pudieron cargar las facturas.')
+      )
       .finally(() => setLoading(false));
+
   }, []);
+
+  const resetForm = () => {
+
+    setClientId(undefined);
+    setEventId(undefined);
+
+    setAmount('');
+    setPaymentMethod(undefined);
+    setStatus('');
+
+    setPaymentDate(
+      new Date().toISOString().split('T')[0]
+    );
+
+    setDueDate('');
+  };
+
+  const handleSubmit = async (
+  e: React.FormEvent<HTMLFormElement>
+) => {
+
+  e.preventDefault();
+
+  if (!eventId) {
+    alert('Debes seleccionar un evento.');
+    return;
+  }
+
+  if (!amount) {
+    alert('Debes ingresar un monto.');
+    return;
+  }
+
+  if (!paymentMethod) {
+    alert('Debes seleccionar un método de pago.');
+    return;
+  }
+
+  const payload = {
+
+    id: editingInvoiceId,
+
+    event_id: Number(eventId),
+
+    amount: parseFloat(amount),
+
+    payment_method: Number(paymentMethod)
+
+  };
+
+  try {
+
+    if (editingInvoiceId) {
+
+      await invoicesAPI.update(payload);
+
+      alert('Factura actualizada correctamente.');
+
+    } else {
+
+      await invoicesAPI.create(payload);
+
+      alert('Factura creada correctamente.');
+    }
+
+    const refreshedInvoices =
+      await invoicesAPI.getAll();
+
+    setInvoices(refreshedInvoices || []);
+
+    resetForm();
+
+    setEditingInvoiceId(null);
+
+    setMode('list');
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert('No se pudo procesar la factura.');
+  }
+};
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;
 
   if (mode === 'insert') {
+
     return (
+
       <div className="space-y-8 max-w-full">
+
         <div className="flex items-center justify-between">
+
           <div>
             <h2 className="text-4xl font-black text-white tracking-tighter uppercase">
               Emisión de Factura
@@ -2122,48 +2559,72 @@ function FinancesSection({
           >
             Ver Facturas
           </button>
+
         </div>
 
         <div className="bg-bg-surface rounded-3xl border border-border p-10 w-full shadow-2xl relative overflow-hidden">
+
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <Receipt className="w-64 h-64 text-white" />
           </div>
 
           <form
             className="space-y-8 relative z-10"
-            onSubmit={(e) => e.preventDefault()}
+            onSubmit={handleSubmit}
           >
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
 
               <div className="space-y-3">
+
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
                   Cliente
                 </label>
 
-                <input
-                  type="text"
-                  placeholder="Nombre del cliente"
-                  className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                <Combobox
+                  options={clients.map((client) => ({
+                    id: client.id.toString(),
+                    label: client.fullname,
+                    sublabel: client.email
+                  }))}
+
+                  value={clientId?.toString()}
+
+                  onChange={(val) => {
+                    setClientId(Number(val));
+                  }}
+
+                  placeholder="Seleccionar Cliente"
                 />
+
               </div>
 
               <div className="space-y-3">
+
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
                   Evento Relacionado
                 </label>
 
                 <Combobox
-                  options={[
-                    { id: '1', label: 'Gala K-Pro 2024', sublabel: 'LOGÍSTICA' },
-                    { id: '2', label: 'Sunset Party', sublabel: 'CORPORATIVO' }
-                  ]}
-                  value=""
-                  onChange={() => { }}
+                  options={events.map((event) => ({
+                    id: event.id.toString(),
+                    label: event.title,
+                    sublabel: event.category || 'EVENTO'
+                  }))}
+
+                  value={eventId?.toString()}
+
+                  onChange={(val) => {
+                    setEventId(Number(val));
+                  }}
+
                   placeholder="Vincular con Evento"
                 />
+
               </div>
 
               <div className="space-y-3">
+
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
                   Monto Total ($)
                 </label>
@@ -2171,53 +2632,79 @@ function FinancesSection({
                 <input
                   type="number"
                   step="0.01"
+                  value={amount}
+                  onChange={(e) =>
+                    setAmount(e.target.value)
+                  }
                   placeholder="0.00"
                   className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-bold"
                 />
+
               </div>
 
               <div className="space-y-3">
+
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
                   Fecha de Emisión
                 </label>
 
                 <input
                   type="date"
-                  defaultValue={new Date().toISOString().split('T')[0]}
+                  value={paymentDate}
+                  onChange={(e) =>
+                    setPaymentDate(e.target.value)
+                  }
                   className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
                 />
+
               </div>
 
               <div className="space-y-3">
+
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
                   Fecha Límite
                 </label>
 
                 <input
                   type="date"
+                  value={dueDate}
+                  onChange={(e) =>
+                    setDueDate(e.target.value)
+                  }
                   className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
                 />
+
               </div>
 
               <div className="space-y-3">
+
                 <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
-                  Estado
+                  Método de Pago
                 </label>
 
                 <Combobox
-                  options={[
-                    { id: 'Paid', label: 'Pagada', sublabel: 'COMPLETADA' },
-                    { id: 'Pending', label: 'Pendiente', sublabel: 'EN ESPERA' },
-                    { id: 'Overdue', label: 'Vencida', sublabel: 'ATRASADA' }
-                  ]}
-                  value=""
-                  onChange={() => { }}
-                  placeholder="Estado de Factura"
+                  options={paymentMethods.map((method) => ({
+                    id: method.id.toString(),
+                    label: method.payment_type,
+                    sublabel: method.descript
+                  }))}
+
+                  value={paymentMethod?.toString()}
+
+                  onChange={(val) => {
+                    setPaymentMethod(Number(val));
+                  }}
+
+                  placeholder="Método de Pago"
                 />
+
               </div>
+
+
             </div>
 
             <div className="pt-6">
+
               <button
                 type="submit"
                 className="w-full bg-primary text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-primary/30 hover:scale-[0.99] transition-all flex items-center justify-center gap-3"
@@ -2225,17 +2712,23 @@ function FinancesSection({
                 <Receipt className="w-5 h-5" />
                 Generar Factura Oficial
               </button>
+
             </div>
+
           </form>
+
         </div>
+
       </div>
     );
   }
 
   return (
+
     <div className="space-y-8">
 
       <div className="flex items-center justify-between">
+
         <div>
           <h2 className="text-4xl font-black text-white tracking-tighter uppercase">
             Registros de Facturación
@@ -2252,16 +2745,19 @@ function FinancesSection({
         >
           Nueva Factura
         </button>
+
       </div>
 
       <div className="bg-bg-surface rounded-3xl border border-border overflow-hidden shadow-xl">
+
         <table className="w-full text-left border-collapse">
 
           <thead>
+
             <tr className="bg-black/40 border-b border-border">
 
               <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
-                método de pago
+                Método de Pago
               </th>
 
               <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
@@ -2273,10 +2769,6 @@ function FinancesSection({
               </th>
 
               <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
-                Estado
-              </th>
-
-              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
                 Fecha
               </th>
 
@@ -2285,17 +2777,20 @@ function FinancesSection({
               </th>
 
             </tr>
+
           </thead>
 
           <tbody className="divide-y divide-border">
+
             {invoices.map((invoice) => (
+
               <tr
                 key={invoice.id}
                 className="hover:bg-primary/5 transition-all group"
               >
 
                 <td className="px-8 py-6 text-sm font-bold text-white">
-                  {invoice.payment_method}
+                  {invoice.payment_type || invoice.payment_method}
                 </td>
 
                 <td className="px-8 py-6 text-sm text-text-muted">
@@ -2307,31 +2802,44 @@ function FinancesSection({
                 </td>
 
                 <td className="px-8 py-6">
-                  <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase border bg-green-500/10 text-green-400 border-green-500/20">
-                    Procesado
-                  </span>
-                </td>
-
-                <td className="px-8 py-6">
                   <span className="px-3 py-1 bg-bg-deep border border-border rounded-lg text-[10px] font-black text-text-muted uppercase">
                     {new Date(invoice.payment_date).toLocaleDateString('es-DO')}
                   </span>
                 </td>
 
                 <td className="px-8 py-6 text-right space-x-3">
-                  <button className="p-2.5 text-text-muted hover:text-primary bg-bg-deep border border-border rounded-xl transition-all">
+
+                  <button
+                    onClick={() => {
+
+                      setEventId(invoice.event_id);
+
+                      setAmount(invoice.amount?.toString() || '');
+
+                      setPaymentMethod(
+                        Number(invoice.payment_method)
+                      );
+
+                      setMode('insert');
+                    }}
+                    className="p-2.5 text-text-muted hover:text-primary bg-bg-deep border border-border rounded-xl transition-all"
+                  >
                     <Edit className="w-4 h-4" />
                   </button>
 
                   <button
                     onClick={async () => {
+
                       try {
+
                         await invoicesAPI.delete(invoice.id);
 
                         setInvoices((prev) =>
                           prev.filter((i) => i.id !== invoice.id)
                         );
+
                       } catch {
+
                         alert('No se pudo eliminar la factura.');
                       }
                     }}
@@ -2339,22 +2847,19 @@ function FinancesSection({
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+
                 </td>
 
               </tr>
+
             ))}
+
           </tbody>
 
         </table>
-      </div>
-    </div>
-  );
-}
 
-function PlaceholderSection({ label }: { label: string }) {
-  return (
-    <div className="p-20 text-center border-2 border-dashed border-border rounded-[40px] text-[10px] font-black text-text-muted uppercase tracking-[0.4em]">
-      {label}
+      </div>
+
     </div>
   );
 }
