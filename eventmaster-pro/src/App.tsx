@@ -44,7 +44,7 @@ export default function App() {
               <Calendar className="w-5 h-5 text-white" />
             </div>
             <h2 className="text-2xl font-black tracking-tighter text-white">
-              K-<span className="text-primary">DAILY</span>
+              KIAV<span className="text-primary">Gestore</span>
             </h2>
           </div>
           <nav className="space-y-1.5">
@@ -70,7 +70,7 @@ export default function App() {
       <main className="flex-1 ml-[260px] min-h-screen flex flex-col">
         <header className="h-[80px] bg-bg-deep/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-10 sticky top-0 z-10">
           <div className="text-[11px] font-black uppercase tracking-[0.2em] text-text-muted">
-            K-DAILY <span className="mx-2 text-border">/</span> <span className="text-white uppercase">{activeSection}</span>
+            KIAV<span className="text-primary">Gestore</span> <span className="mx-2 text-border">/</span> <span className="text-white uppercase">{activeSection}</span>
           </div>
           <div className="flex items-center gap-6">
             <div className="relative group">
@@ -2296,92 +2296,291 @@ function ClientList() {
 
 // ─── DASHBOARD ──────────────────────────────────────────────────────────────
 
-function DashboardOverview() {
+function DashboardOverview({
+  setSection
+}: {
+  setSection: (section: string) => void;
+}) {
+
   const [events, setEvents] = useState<EventService[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([eventsAPI.getAll(), inventoryAPI.getAlerts()])
-      .then(([evs, alts]) => {
-        setEvents(evs.slice(0, 3));
-        setAlerts(alts);
+
+    Promise.all([
+      eventsAPI.getAll(),
+      inventoryAPI.getAlerts(),
+      invoicesAPI.getAll()
+    ])
+      .then(([evs, alts, invs]) => {
+
+        const today = new Date();
+
+        const upcomingEvents =
+          (evs || [])
+            .filter((event: any) =>
+              new Date(event.event_date) >= today
+            )
+            .sort(
+              (a: any, b: any) =>
+                new Date(a.event_date).getTime() -
+                new Date(b.event_date).getTime()
+            );
+
+        setEvents(upcomingEvents);
+
+        setAlerts(alts || []);
+
+        setInvoices(invs || []);
       })
       .finally(() => setLoading(false));
+
   }, []);
 
   if (loading) return <LoadingSpinner />;
 
+  // EVENTOS ACTIVOS
+  const activeEvents =
+    events.filter(
+      (event: any) =>
+        new Date(event.event_date) >= new Date()
+    ).length;
+
+  // TOTAL INGRESOS
+  const totalRevenue =
+    invoices.reduce(
+      (acc: number, invoice: any) =>
+        acc + Number(invoice.amount || 0),
+      0
+    );
+
+  const formattedRevenue =
+    new Intl.NumberFormat('es-DO', {
+      style: 'currency',
+      currency: 'DOP'
+    }).format(totalRevenue);
+
   return (
+
     <div className="space-y-10">
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard title="Eventos Activos" value="12" trend="+8%" icon={<Calendar className="w-5 h-5 text-primary" />} />
-        <StatCard title="Ingresos" value="$24.5k" trend="+12%" icon={<TrendingUp className="w-5 h-5 text-success" />} />
-        <StatCard title="Stock Crítico" value={alerts.length.toString()} trend="Alertas" icon={<AlertTriangle className="w-5 h-5 text-warning" />} />
-        <StatCard title="Satisfacción" value="4.9" trend="+0.2" icon={<CheckCircle2 className="w-5 h-5 text-primary" />} />
+
+        <StatCard
+          title="Eventos Activos"
+          value={activeEvents.toString()}
+          trend={`${events.length} próximos`}
+          icon={
+            <Calendar className="w-5 h-5 text-primary" />
+          }
+        />
+
+        <StatCard
+          title="Total de Ingresos"
+          value={formattedRevenue}
+          trend="Facturación"
+          icon={
+            <TrendingUp className="w-5 h-5 text-success" />
+          }
+        />
+
+        <StatCard
+          title="Stock Crítico"
+          value={alerts.length.toString()}
+          trend="Alertas"
+          icon={
+            <AlertTriangle className="w-5 h-5 text-warning" />
+          }
+        />
+
+        <StatCard
+          title="Ingreso Esperado"
+          value={
+            new Intl.NumberFormat('es-DO', {
+              style: 'currency',
+              currency: 'DOP'
+            }).format(
+              events.reduce(
+                (acc: number, event: any) =>
+                  acc + Number(event.base_price || 0),
+                0
+              )
+            )
+          }
+
+          trend="Eventos Programados"
+          icon={
+            <TrendingUp className="w-5 h-5 text-primary" />
+          }
+        />
+
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Próximos Eventos */}
+
+        {/* EVENTOS */}
         <div className="bg-bg-surface rounded-[32px] border border-border p-8">
+
           <div className="flex items-center justify-between mb-8">
+
             <h3 className="text-xl font-bold text-white flex items-center gap-3">
               <Clock className="w-5 h-5 text-primary" />
               Eventos Próximos
             </h3>
-            <button className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline">Ver todo</button>
+
+
           </div>
+
           <div className="space-y-4">
-            {events.map(event => (
-              <div key={event.id} className="flex items-center justify-between p-4 bg-bg-deep/50 rounded-2xl border border-border/50">
+
+            {events.slice(0, 3).map((event) => (
+
+              <div
+                key={event.id}
+                className="flex items-center justify-between p-4 bg-bg-deep/50 rounded-2xl border border-border/50"
+              >
+
                 <div className="flex items-center gap-4">
+
                   <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    {new Date(event.event_date).getDate()}
+
+                    {new Date(
+                      event.event_date
+                    ).getDate()}
+
                   </div>
+
                   <div>
-                    <p className="text-sm font-bold text-white">{event.title}</p>
-                    <p className="text-[10px] text-text-muted uppercase tracking-wider">{event.e_location}</p>
+
+                    <p className="text-sm font-bold text-white">
+                      {event.title}
+                    </p>
+
+                    <p className="text-[10px] text-text-muted uppercase tracking-wider">
+
+                      {event.e_location}
+
+                    </p>
+
+                    <p className="text-[10px] text-primary mt-1 font-bold">
+
+                      {new Date(
+                        event.event_date
+                      ).toLocaleDateString('es-DO', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+
+                    </p>
+
                   </div>
+
                 </div>
+
                 <ArrowRight className="w-4 h-4 text-text-muted" />
+
               </div>
+
             ))}
+
+            {events.length === 0 && (
+
+              <div className="py-12 text-center">
+
+                <Calendar className="w-12 h-12 text-primary mx-auto mb-4 opacity-20" />
+
+                <p className="text-sm text-text-muted italic">
+                  No hay eventos próximos registrados.
+                </p>
+
+              </div>
+
+            )}
+
           </div>
+
         </div>
 
-        {/* Alertas de Inventario */}
+        {/* ALERTAS */}
         <div className="bg-bg-surface rounded-[32px] border border-border p-8">
+
           <div className="flex items-center justify-between mb-8">
+
             <h3 className="text-xl font-bold text-white flex items-center gap-3">
+
               <AlertTriangle className="w-5 h-5 text-warning" />
+
               Alertas de Stock
+
             </h3>
+
           </div>
+
           <div className="space-y-4">
-            {alerts.map(alert => (
-              <div key={alert.id} className="p-4 bg-yellow-500/5 rounded-2xl border border-yellow-500/20 flex gap-4">
+
+            {alerts.map((alert) => (
+
+              <div
+                key={alert.id}
+                className="p-4 bg-yellow-500/5 rounded-2xl border border-yellow-500/20 flex gap-4"
+              >
+
                 <div className="w-10 h-10 shrink-0 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+
                   <Boxes className="w-5 h-5 text-yellow-500" />
+
                 </div>
+
                 <div>
-                  <p className="text-xs font-bold text-white">{alert.alert_message}</p>
-                  <p className="text-[10px] text-text-muted mt-1">{new Date(alert.alert_date).toLocaleDateString()}</p>
+
+                  <p className="text-xs font-bold text-white">
+                    {alert.alert_message}
+                  </p>
+
+                  <p className="text-[10px] text-text-muted mt-1">
+
+                    {new Date(
+                      alert.alert_date
+                    ).toLocaleDateString('es-DO')}
+
+                  </p>
+
                 </div>
+
               </div>
+
             ))}
+
             {alerts.length === 0 && (
+
               <div className="py-12 text-center">
+
                 <CheckCircle2 className="w-12 h-12 text-success mx-auto mb-4 opacity-20" />
-                <p className="text-sm text-text-muted italic">Todo el stock está en niveles óptimos.</p>
+
+                <p className="text-sm text-text-muted italic">
+
+                  Todo el stock está en niveles óptimos.
+
+                </p>
+
               </div>
+
             )}
+
           </div>
+
         </div>
+
       </div>
+
     </div>
+
   );
 }
-
 function StatCard({ title, value, trend, icon }: { title: string, value: string, trend: string, icon: React.ReactNode }) {
   return (
     <div className="bg-bg-surface p-7 rounded-[28px] border border-border group hover:border-primary/30 transition-all shadow-sm">
@@ -2466,71 +2665,71 @@ function FinancesSection({
   };
 
   const handleSubmit = async (
-  e: React.FormEvent<HTMLFormElement>
-) => {
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
 
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!eventId) {
-    alert('Debes seleccionar un evento.');
-    return;
-  }
-
-  if (!amount) {
-    alert('Debes ingresar un monto.');
-    return;
-  }
-
-  if (!paymentMethod) {
-    alert('Debes seleccionar un método de pago.');
-    return;
-  }
-
-  const payload = {
-
-    id: editingInvoiceId,
-
-    event_id: Number(eventId),
-
-    amount: parseFloat(amount),
-
-    payment_method: Number(paymentMethod)
-
-  };
-
-  try {
-
-    if (editingInvoiceId) {
-
-      await invoicesAPI.update(payload);
-
-      alert('Factura actualizada correctamente.');
-
-    } else {
-
-      await invoicesAPI.create(payload);
-
-      alert('Factura creada correctamente.');
+    if (!eventId) {
+      alert('Debes seleccionar un evento.');
+      return;
     }
 
-    const refreshedInvoices =
-      await invoicesAPI.getAll();
+    if (!amount) {
+      alert('Debes ingresar un monto.');
+      return;
+    }
 
-    setInvoices(refreshedInvoices || []);
+    if (!paymentMethod) {
+      alert('Debes seleccionar un método de pago.');
+      return;
+    }
 
-    resetForm();
+    const payload = {
 
-    setEditingInvoiceId(null);
+      id: editingInvoiceId,
 
-    setMode('list');
+      event_id: Number(eventId),
 
-  } catch (err) {
+      amount: parseFloat(amount),
 
-    console.error(err);
+      payment_method: Number(paymentMethod)
 
-    alert('No se pudo procesar la factura.');
-  }
-};
+    };
+
+    try {
+
+      if (editingInvoiceId) {
+
+        await invoicesAPI.update(payload);
+
+        alert('Factura actualizada correctamente.');
+
+      } else {
+
+        await invoicesAPI.create(payload);
+
+        alert('Factura creada correctamente.');
+      }
+
+      const refreshedInvoices =
+        await invoicesAPI.getAll();
+
+      setInvoices(refreshedInvoices || []);
+
+      resetForm();
+
+      setEditingInvoiceId(null);
+
+      setMode('list');
+
+    } catch (err) {
+
+      console.error(err);
+
+      alert('No se pudo procesar la factura.');
+    }
+  };
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;

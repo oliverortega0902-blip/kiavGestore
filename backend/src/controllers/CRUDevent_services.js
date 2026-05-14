@@ -116,7 +116,7 @@ export const getAllEventServices = async (req, res) => {
     const pool = getPool();
 
     const result = await pool.request()
-      .query("SELECT * FROM vw_events_services");
+      .query("SELECT * FROM vw_events_services ORDER BY event_date ASC");
 
     res.json(result.recordset);
 
