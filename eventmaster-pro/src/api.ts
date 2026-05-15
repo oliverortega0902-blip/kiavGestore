@@ -79,6 +79,34 @@ export const elementStatusAPI = {
   delete: (id: number) => fetchAPI(`/elementStatus/${id}`, { method: 'DELETE' }),
 };
 
+export const eventItemsAPI = {
+
+  getAll: () =>
+    fetchAPI('/eventItems'),
+
+  getById: (id: number) =>
+    fetchAPI(`/eventItems/${id}`),
+
+  getByEvent: (eventId: number) =>
+    fetchAPI(`/eventItems/${eventId}`),
+
+  create: (data: any) =>
+    fetchAPI('/eventItems/add', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (data: any) =>
+    fetchAPI('/eventItems/edit', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: number) =>
+    fetchAPI(`/eventItems/${id}`, {
+      method: 'DELETE',
+    }),
+};
 
 //---------------------------------------------EMPLEADOS---------------------------------------------//
 // ============ EMPLOYEES API ============

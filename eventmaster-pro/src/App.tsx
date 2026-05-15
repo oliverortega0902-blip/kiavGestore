@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
 import {
   eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI,
-  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI
+  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI
 } from './api';
 
 export default function App() {
@@ -249,6 +249,17 @@ function EventsList() {
   const [base_price, setBasePrice] = useState('');
   const [duration_hours, setDurationHours] = useState('');
 
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [inventoryEvent, setInventoryEvent] = useState<EventService | null>(null);
+
+  const [allInventory, setAllInventory] = useState<any[]>([]);
+  const [assignedInventory, setAssignedInventory] = useState<any[]>([]);
+
+  const [selectedInventoryToAdd, setSelectedInventoryToAdd] = useState<string | undefined>(undefined);
+  const [inventoryQuantity, setInventoryQuantity] = useState('1');
+
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+
   useEffect(() => {
     Promise.all([
       eventsAPI.getAll(),
@@ -333,6 +344,32 @@ function EventsList() {
       setAssignLoading(false);
     }
   };
+
+  const openInventoryModal = async (event: EventService) => {
+    setInventoryLoading(true);
+    setInventoryEvent(event);
+    setShowInventoryModal(true);
+
+    try {
+      const [inventoryData, assignedData] = await Promise.all([
+        inventoryAPI.getAll(),
+        eventItemsAPI.getByEvent(event.id),
+      ]);
+
+      setAllInventory(inventoryData || []);
+      setAssignedInventory(assignedData || []);
+
+      setSelectedInventoryToAdd(undefined);
+      setInventoryQuantity('1');
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo cargar el inventario del evento.');
+      setShowInventoryModal(false);
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
 
   const addEmployeeToEvent = async () => {
     if (!assigningEvent || !selectedEmployeeToAdd) return;
@@ -752,6 +789,209 @@ function EventsList() {
         </div>
       )}
 
+            {showInventoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowInventoryModal(false)}
+          />
+
+          <div className="relative bg-bg-surface border border-border w-full max-w-3xl rounded-[24px] shadow-2xl p-6 overflow-y-auto max-h-[85vh] z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-text-muted mb-1">
+                  Evento
+                </p>
+
+                <input
+                  type="text"
+                  readOnly
+                  value={inventoryEvent?.title || ''}
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                />
+              </div>
+
+              <button
+                onClick={() => setShowInventoryModal(false)}
+                className="p-2 rounded-full bg-bg-deep hover:bg-white/10 text-text-muted transition-all"
+              >
+                <Plus className="w-5 h-5 rotate-45" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_120px] gap-4 mb-6">
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
+                  Inventario
+                </label>
+
+                <Combobox
+                  options={allInventory.map((item) => ({
+                    id: item.id,
+                    label: item.element || `Inventario #${item.id}`,
+                  }))}
+                  value={selectedInventoryToAdd}
+                  onChange={(val) =>
+                    setSelectedInventoryToAdd(Number(val))
+                  }
+                  placeholder="Seleccionar inventario"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
+                  Cantidad
+                </label>
+
+                <input
+                  type="number"
+                  min="1"
+                  value={inventoryQuantity}
+                  onChange={(e) =>
+                    setInventoryQuantity(e.target.value)
+                  }
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  className="w-full px-4 py-3 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px]"
+                  onClick={async () => {
+                    if (
+                      !inventoryEvent ||
+                      !selectedInventoryToAdd
+                    ) return;
+
+                    try {
+                      setInventoryLoading(true);
+
+                      await eventItemsAPI.create({
+                        event: inventoryEvent.id,
+                        inventory: selectedInventoryToAdd,
+                        quantity: Number(inventoryQuantity),
+                      });
+
+                      const refreshed =
+                        await eventItemsAPI.getByEvent(
+                          inventoryEvent.id
+                        );
+
+                      setAssignedInventory(refreshed || []);
+                      setSelectedInventoryToAdd(undefined);
+                      setInventoryQuantity('1');
+                    } catch (err) {
+                      console.error(err);
+                      alert(
+                        'No se pudo añadir el inventario.'
+                      );
+                    } finally {
+                      setInventoryLoading(false);
+                    }
+                  }}
+                  disabled={
+                    inventoryLoading ||
+                    !selectedInventoryToAdd
+                  }
+                >
+                  Añadir
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-black uppercase tracking-widest text-text-muted mb-3">
+                Inventario asignado
+              </h4>
+
+              <div className="overflow-x-auto rounded-3xl border border-border">
+                <table className="min-w-full text-left">
+                  <thead>
+                    <tr className="bg-bg-deep/50 text-[10px] uppercase tracking-[0.24em] text-text-muted">
+                      <th className="px-4 py-3">ID</th>
+                      <th className="px-4 py-3">Elemento</th>
+                      <th className="px-4 py-3">Cantidad</th>
+                      <th className="px-4 py-3">Acción</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {assignedInventory.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-4 py-6 text-sm text-text-muted"
+                        >
+                          No hay inventario asignado.
+                        </td>
+                      </tr>
+                    ) : (
+                      assignedInventory.map((record: any) => (
+                        <tr
+                          key={record.id}
+                          className="border-t border-border text-sm text-white"
+                        >
+                          <td className="px-4 py-4">
+                            {record.inventory}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            {record.element}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            {record.quantity}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            <button
+                              onClick={async () => {
+                                if (
+                                  !window.confirm(
+                                    'Eliminar esta asignación?'
+                                  )
+                                ) return;
+
+                                try {
+                                  setInventoryLoading(true);
+
+                                  await eventItemsAPI.delete(
+                                    record.id
+                                  );
+
+                                  const refreshed =
+                                    await eventItemsAPI.getByEvent(
+                                      inventoryEvent!.id
+                                    );
+
+                                  setAssignedInventory(
+                                    refreshed || []
+                                  );
+                                } catch (err) {
+                                  console.error(err);
+                                  alert(
+                                    'No se pudo eliminar.'
+                                  );
+                                } finally {
+                                  setInventoryLoading(false);
+                                }
+                              }}
+                              className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative before:absolute before:left-[35px] before:top-0 before:bottom-0 before:w-0.5 before:bg-gradient-to-b before:from-primary/50 before:via-border before:to-transparent">
         <div className="space-y-6">
           {events.map((event) => (
@@ -850,7 +1090,18 @@ function EventsList() {
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openInventoryModal(event);
+                        }}
+                        className="p-2 bg-bg-deep border border-border rounded-xl text-text-muted hover:text-white transition-all"
+                        title="Asignar inventario"
+                      >
+                        <Boxes className="w-3.5 h-3.5" />
+                      </button>
                     </div>
+
                   </div>
 
                 </div>
@@ -884,6 +1135,18 @@ function InventoryList() {
   const [actualPrice, setActualPrice] = useState('');
   const [stockActual, setStockActual] = useState('');
   const [stockAlert, setStockAlert] = useState('');
+
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [inventoryEvent, setInventoryEvent] = useState<EventService | null>(null);
+
+  const [allInventory, setAllInventory] = useState<any[]>([]);
+  const [assignedInventory, setAssignedInventory] = useState<any[]>([]);
+
+  const [selectedInventoryToAdd, setSelectedInventoryToAdd] = useState<number | undefined>(undefined);
+
+  const [inventoryQuantity, setInventoryQuantity] = useState('1');
+
+  const [inventoryLoading, setInventoryLoading] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -1075,6 +1338,65 @@ function InventoryList() {
         'No se pudo guardar el recurso.'
       );
     }
+  };
+
+  const addInventoryToEvent = async () => {
+    if (!inventoryEvent || !selectedInventoryToAdd) return;
+
+    setInventoryLoading(true);
+
+    try {
+      await eventItemsAPI.create({
+        event: inventoryEvent.id,
+        inventory: selectedInventoryToAdd,
+        quantity: Number(inventoryQuantity) || 1,
+      });
+
+      const refreshed = await eventItemsAPI.getByEvent(inventoryEvent.id);
+
+      setAssignedInventory(refreshed || []);
+
+      setSelectedInventoryToAdd(undefined);
+      setInventoryQuantity('1');
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo añadir el inventario.');
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+
+  const deleteAssignedInventory = async (recordId: number) => {
+    if (!window.confirm('¿Eliminar este inventario del evento?')) return;
+
+    setInventoryLoading(true);
+
+    try {
+      await eventItemsAPI.delete(recordId);
+
+      const refreshed = await eventItemsAPI.getByEvent(inventoryEvent!.id);
+
+      setAssignedInventory(refreshed || []);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo eliminar el inventario.');
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+  const closeInventoryModal = () => {
+    setShowInventoryModal(false);
+
+    setInventoryEvent(null);
+
+    setAllInventory([]);
+    setAssignedInventory([]);
+
+    setSelectedInventoryToAdd(undefined);
+
+    setInventoryQuantity('1');
   };
 
   const getInventoryStatusLabel = (
@@ -1440,10 +1762,294 @@ function InventoryList() {
 
             </div>
           </motion.div>
-        ))}
+        )
 
+        )}
+
+        {showInventoryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={closeInventoryModal}
+            />
+
+            <div className="relative bg-bg-surface border border-border w-full max-w-4xl rounded-[24px] shadow-2xl p-6 overflow-y-auto max-h-[85vh] z-10">
+
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-text-muted mb-1">
+                    Evento
+                  </p>
+
+                  <input
+                    type="text"
+                    readOnly
+                    value={inventoryEvent?.title || ''}
+                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                  />
+                </div>
+
+                <button
+                  onClick={closeInventoryModal}
+                  className="p-2 rounded-full bg-bg-deep hover:bg-white/10 text-text-muted transition-all"
+                >
+                  <Plus className="w-5 h-5 rotate-45" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[1.3fr_120px_120px] gap-4 mb-6">
+
+                <div>
+                  <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
+                    Inventario
+                  </label>
+
+                  <Combobox
+                    options={allInventory.map((item) => ({
+                      id: item.id,
+                      label: item.element || `Item #${item.id}`,
+                    }))}
+                    value={selectedInventoryToAdd}
+                    onChange={(val) => setSelectedInventoryToAdd(Number(val))}
+                    placeholder="Seleccionar inventario"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
+                    Cantidad
+                  </label>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={inventoryQuantity}
+                    onChange={(e) => setInventoryQuantity(e.target.value)}
+                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                  />
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    className="w-full px-4 py-3 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px]"
+                    onClick={addInventoryToEvent}
+                    disabled={inventoryLoading || !selectedInventoryToAdd}
+                  >
+                    Añadir
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-black uppercase tracking-widest text-text-muted mb-3">
+                  Inventario asignado
+                </h4>
+
+                <div className="overflow-x-auto rounded-3xl border border-border">
+                  <table className="min-w-full text-left">
+
+                    <thead>
+                      <tr className="bg-bg-deep/50 text-[10px] uppercase tracking-[0.24em] text-text-muted">
+                        <th className="px-4 py-3">ID</th>
+                        <th className="px-4 py-3">Elemento</th>
+                        <th className="px-4 py-3">Cantidad</th>
+                        <th className="px-4 py-3">Acción</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+
+                      {assignedInventory.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="px-4 py-6 text-sm text-text-muted"
+                          >
+                            No hay inventario asignado a este evento.
+                          </td>
+                        </tr>
+                      ) : (
+                        assignedInventory.map((record: any) => (
+                          <tr
+                            key={record.id}
+                            className="border-t border-border text-sm text-white"
+                          >
+                            <td className="px-4 py-4">
+                              {record.inventory}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              {record.element}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              {record.quantity}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <button
+                                onClick={() => deleteAssignedInventory(record.id)}
+                                className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+
+                    </tbody>
+
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showInventoryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={closeInventoryModal}
+            />
+
+            <div className="relative bg-bg-surface border border-border w-full max-w-4xl rounded-[24px] shadow-2xl p-6 overflow-y-auto max-h-[85vh] z-10">
+
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-text-muted mb-1">
+                    Evento
+                  </p>
+
+                  <input
+                    type="text"
+                    readOnly
+                    value={inventoryEvent?.title || ''}
+                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                  />
+                </div>
+
+                <button
+                  onClick={closeInventoryModal}
+                  className="p-2 rounded-full bg-bg-deep hover:bg-white/10 text-text-muted transition-all"
+                >
+                  <Plus className="w-5 h-5 rotate-45" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-[1.3fr_120px_120px] gap-4 mb-6">
+
+                <div>
+                  <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
+                    Inventario
+                  </label>
+
+                  <Combobox
+                    options={allInventory.map((item) => ({
+                      id: item.id,
+                      label: item.element || `Item #${item.id}`,
+                    }))}
+                    value={selectedInventoryToAdd}
+                    onChange={(val) => setSelectedInventoryToAdd(Number(val))}
+                    placeholder="Seleccionar inventario"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
+                    Cantidad
+                  </label>
+
+                  <input
+                    type="number"
+                    min="1"
+                    value={inventoryQuantity}
+                    onChange={(e) => setInventoryQuantity(e.target.value)}
+                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                  />
+                </div>
+
+                <div className="flex items-end">
+                  <button
+                    className="w-full px-4 py-3 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px]"
+                    onClick={addInventoryToEvent}
+                    disabled={inventoryLoading || !selectedInventoryToAdd}
+                  >
+                    Añadir
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-black uppercase tracking-widest text-text-muted mb-3">
+                  Inventario asignado
+                </h4>
+
+                <div className="overflow-x-auto rounded-3xl border border-border">
+                  <table className="min-w-full text-left">
+
+                    <thead>
+                      <tr className="bg-bg-deep/50 text-[10px] uppercase tracking-[0.24em] text-text-muted">
+                        <th className="px-4 py-3">ID</th>
+                        <th className="px-4 py-3">Elemento</th>
+                        <th className="px-4 py-3">Cantidad</th>
+                        <th className="px-4 py-3">Acción</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+
+                      {assignedInventory.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="px-4 py-6 text-sm text-text-muted"
+                          >
+                            No hay inventario asignado a este evento.
+                          </td>
+                        </tr>
+                      ) : (
+                        assignedInventory.map((record: any) => (
+                          <tr
+                            key={record.id}
+                            className="border-t border-border text-sm text-white"
+                          >
+                            <td className="px-4 py-4">
+                              {record.inventory}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              {record.element}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              {record.quantity}
+                            </td>
+
+                            <td className="px-4 py-4">
+                              <button
+                                onClick={() => deleteAssignedInventory(record.id)}
+                                className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+
+                    </tbody>
+
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
+
   );
 }
 
