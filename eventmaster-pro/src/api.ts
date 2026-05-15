@@ -194,8 +194,8 @@ export const clientTypesAPI = {
   }),
 };
 
+//---------------------------------------------Finanzas---------------------------------------------//
 //---------------------------------------------ingresos---------------------------------------------//
-
 // ============ INVOICES API ============
 export const invoicesAPI = {
   getAll: () =>
@@ -244,6 +244,33 @@ export const paymentMethodsAPI = {
 
   delete: (id: number) =>
     fetchAPI(`/paymentMethods/${id}`, {
+      method: 'DELETE',
+    }),
+};
+
+//---------------------------------------------egresos---------------------------------------------//
+export const expensesAPI = {
+
+  getAll: () =>
+    fetchAPI('/expenses'),
+
+  getById: (id: number) =>
+    fetchAPI(`/expenses/${id}`),
+
+  create: (data: any) =>
+    fetchAPI('/expenses/create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (data: any) =>
+    fetchAPI('/expenses/edit', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: number) =>
+    fetchAPI(`/expenses/${id}`, {
       method: 'DELETE',
     }),
 };

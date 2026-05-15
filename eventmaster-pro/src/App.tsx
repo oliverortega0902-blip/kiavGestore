@@ -9,13 +9,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
 import {
   eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI,
-  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI
+  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI
 } from './api';
 
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>('events');
   const [searchQuery, setSearchQuery] = useState('');
   const [financeMode, setFinanceMode] = useState<'insert' | 'list'>('insert');
+  const [expensesMode, setExpensesMode] = useState<'insert' | 'list'>('list');
 
   const renderContent = () => {
     switch (activeSection) {
@@ -31,6 +32,13 @@ export default function App() {
           <FinancesSection
             mode={financeMode}
             setMode={setFinanceMode}
+          />
+        );
+      case 'expenses':
+        return (
+          <ExpensesSection
+            mode={expensesMode}
+            setMode={setExpensesMode}
           />
         );
     }
@@ -56,6 +64,12 @@ export default function App() {
             <NavItem icon={<Users className="w-5 h-5" />} label="Empleados" active={activeSection === 'employees'} onClick={() => setActiveSection('employees')} />
             <NavItem icon={<UserCircle className="w-5 h-5" />} label="Clientes" active={activeSection === 'clients'} onClick={() => setActiveSection('clients')} />
             <NavItem icon={<FileText className="w-5 h-5" />} label="Finanzas" active={activeSection === 'finances'} onClick={() => setActiveSection('finances')} />
+            <NavItem
+              icon={<Receipt className="w-5 h-5" />}
+              label="Egresos"
+              active={activeSection === 'expenses'}
+              onClick={() => setActiveSection('expenses')}
+            />
           </nav>
         </div>
         <div className="mt-auto p-6 border-t border-border bg-black/20">
@@ -789,7 +803,7 @@ function EventsList() {
         </div>
       )}
 
-            {showInventoryModal && (
+      {showInventoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -3839,6 +3853,521 @@ function FinancesSection({
                       } catch {
 
                         alert('No se pudo eliminar la factura.');
+                      }
+                    }}
+                    className="p-2.5 text-text-muted hover:text-red-400 bg-bg-deep border border-border rounded-xl transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+
+                </td>
+
+              </tr>
+
+            ))}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </div>
+  );
+}
+
+//-----------------------------------------------Egresos---------------------------------------------//
+// ─── EGRESOS ───────────────────────────────────────────────────────────────
+
+function ExpensesSection({
+  mode,
+  setMode
+}: {
+  mode: 'insert' | 'list',
+  setMode: (m: 'insert' | 'list') => void
+}) {
+
+  const [expenses, setExpenses] = useState<any[]>([]);
+
+  const [editingExpenseId, setEditingExpenseId] = useState<number | null>(null);
+
+  const [events, setEvents] = useState<any[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [eventId, setEventId] = useState<number | undefined>();
+
+  const [descript, setDescript] = useState('');
+  const [amount, setAmount] = useState('');
+
+  const [paymentMethod, setPaymentMethod] = useState<number | undefined>();
+
+  const [expensesStatus, setExpensesStatus] = useState(false);
+
+  const [expenseDate, setExpenseDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+
+  useEffect(() => {
+
+    Promise.all([
+      expensesAPI.getAll(),
+      eventsAPI.getAll(),
+      paymentMethodsAPI.getAll()
+    ])
+      .then(([expensesData, eventsData, paymentMethodsData]) => {
+
+        setExpenses(expensesData || []);
+        setEvents(eventsData || []);
+        setPaymentMethods(paymentMethodsData || []);
+
+      })
+      .catch(() =>
+        setError('No se pudieron cargar los egresos.')
+      )
+      .finally(() => setLoading(false));
+
+  }, []);
+
+  const resetForm = () => {
+
+    setEventId(undefined);
+
+    setDescript('');
+    setAmount('');
+
+    setPaymentMethod(undefined);
+
+    setExpensesStatus(false);
+
+    setExpenseDate(
+      new Date().toISOString().split('T')[0]
+    );
+  };
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+
+    e.preventDefault();
+
+    if (!eventId) {
+      alert('Debes seleccionar un evento.');
+      return;
+    }
+
+    if (!descript.trim()) {
+      alert('Debes ingresar una descripción.');
+      return;
+    }
+
+    if (!amount) {
+      alert('Debes ingresar un monto.');
+      return;
+    }
+
+    if (!paymentMethod) {
+      alert('Debes seleccionar un método de pago.');
+      return;
+    }
+
+    const payload = {
+
+      id: editingExpenseId,
+
+      event_id: Number(eventId),
+
+      descript: descript.trim(),
+
+      amount: parseFloat(amount),
+
+      payment_method: Number(paymentMethod),
+
+      expenses_status: expensesStatus,
+
+      expense_date: expenseDate
+
+    };
+
+    try {
+
+      if (editingExpenseId) {
+
+        await expensesAPI.update(payload);
+
+        alert('Egreso actualizado correctamente.');
+
+      } else {
+
+        await expensesAPI.create(payload);
+
+        alert('Egreso registrado correctamente.');
+      }
+
+      const refreshedExpenses =
+        await expensesAPI.getAll();
+
+      setExpenses(refreshedExpenses || []);
+
+      resetForm();
+
+      setEditingExpenseId(null);
+
+      setMode('list');
+
+    } catch (err) {
+
+      console.error(err);
+
+      alert('No se pudo procesar el egreso.');
+    }
+  };
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} />;
+
+  if (mode === 'insert') {
+
+    return (
+
+      <div className="space-y-8 max-w-full">
+
+        <div className="flex items-center justify-between">
+
+          <div>
+            <h2 className="text-4xl font-black text-white tracking-tighter uppercase">
+              Registro de Egreso
+            </h2>
+
+            <p className="text-sm text-text-muted mt-1 font-medium italic">
+              Registra un nuevo gasto del sistema.
+            </p>
+          </div>
+
+          <button
+            onClick={() => setMode('list')}
+            className="bg-bg-surface border border-border text-text-muted hover:text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-[0.2em] transition-all"
+          >
+            Ver Egresos
+          </button>
+
+        </div>
+
+        <div className="bg-bg-surface rounded-3xl border border-border p-10 w-full shadow-2xl relative overflow-hidden">
+
+          <div className="absolute top-0 right-0 p-8 opacity-5">
+            <Receipt className="w-64 h-64 text-white" />
+          </div>
+
+          <form
+            className="space-y-8 relative z-10"
+            onSubmit={handleSubmit}
+          >
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+
+              <div className="space-y-3">
+
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Evento Relacionado
+                </label>
+
+                <Combobox
+                  options={events.map((event) => ({
+                    id: event.id.toString(),
+                    label: event.title,
+                    sublabel: event.category || 'EVENTO'
+                  }))}
+
+                  value={eventId?.toString()}
+
+                  onChange={(val) => {
+                    setEventId(Number(val));
+                  }}
+
+                  placeholder="Seleccionar Evento"
+                />
+
+              </div>
+
+              <div className="space-y-3">
+
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Método de Pago
+                </label>
+
+                <Combobox
+                  options={paymentMethods.map((method) => ({
+                    id: method.id.toString(),
+                    label: method.payment_type,
+                    sublabel: method.descript
+                  }))}
+
+                  value={paymentMethod?.toString()}
+
+                  onChange={(val) => {
+                    setPaymentMethod(Number(val));
+                  }}
+
+                  placeholder="Método de Pago"
+                />
+
+              </div>
+
+              <div className="space-y-3">
+
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Monto ($)
+                </label>
+
+                <input
+                  type="number"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) =>
+                    setAmount(e.target.value)
+                  }
+                  placeholder="0.00"
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-bold"
+                />
+
+              </div>
+
+              <div className="md:col-span-3 space-y-3">
+
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Descripción
+                </label>
+
+                <textarea
+                  value={descript}
+                  onChange={(e) =>
+                    setDescript(e.target.value)
+                  }
+                  placeholder="Descripción del gasto..."
+                  className="w-full h-32 bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                />
+
+              </div>
+
+              <div className="space-y-3">
+
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                  Fecha
+                </label>
+
+                <input
+                  type="date"
+                  value={expenseDate}
+                  onChange={(e) =>
+                    setExpenseDate(e.target.value)
+                  }
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                />
+
+              </div>
+
+              <div className="space-y-3 flex items-end">
+
+                <label className="flex items-center gap-3 text-sm font-bold text-white">
+
+                  <input
+                    type="checkbox"
+                    checked={expensesStatus}
+                    onChange={(e) =>
+                      setExpensesStatus(e.target.checked)
+                    }
+                    className="w-5 h-5 accent-primary"
+                  />
+
+                  Egreso Pagado
+
+                </label>
+
+              </div>
+
+            </div>
+
+            <div className="pt-6">
+
+              <button
+                type="submit"
+                className="w-full bg-primary text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-primary/30 hover:scale-[0.99] transition-all flex items-center justify-center gap-3"
+              >
+                <Receipt className="w-5 h-5" />
+                Registrar Egreso
+              </button>
+
+            </div>
+
+          </form>
+
+        </div>
+
+      </div>
+    );
+  }
+
+  return (
+
+    <div className="space-y-8">
+
+      <div className="flex items-center justify-between">
+
+        <div>
+          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">
+            Historial de Egresos
+          </h2>
+
+          <p className="text-sm text-text-muted mt-1 font-medium italic">
+            Registro completo de gastos y pagos.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setMode('insert')}
+          className="bg-primary text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-[0.2em] transition-all hover:scale-[0.98]"
+        >
+          Nuevo Egreso
+        </button>
+
+      </div>
+
+      <div className="bg-bg-surface rounded-3xl border border-border overflow-hidden shadow-xl">
+
+        <table className="w-full text-left border-collapse">
+
+          <thead>
+
+            <tr className="bg-black/40 border-b border-border">
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Evento
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Descripción
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Método
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Monto
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Estado
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                Fecha
+              </th>
+
+              <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted text-right">
+                Control
+              </th>
+
+            </tr>
+
+          </thead>
+
+          <tbody className="divide-y divide-border">
+
+            {expenses.map((expense) => (
+
+              <tr
+                key={expense.id}
+                className="hover:bg-primary/5 transition-all group"
+              >
+
+                <td className="px-8 py-6 text-sm font-bold text-white">
+                  {expense.event_title}
+                </td>
+
+                <td className="px-8 py-6 text-sm text-text-muted">
+                  {expense.descript}
+                </td>
+
+                <td className="px-8 py-6 text-sm text-text-muted">
+                  {expense.payment_type}
+                </td>
+
+                <td className="px-8 py-6 text-sm font-black text-white">
+                  ${Number(expense.amount).toLocaleString()}
+                </td>
+
+                <td className="px-8 py-6">
+
+                  <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${
+                    expense.expenses_status
+                      ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                  }`}>
+                    {expense.expenses_status ? 'Pagado' : 'Pendiente'}
+                  </span>
+
+                </td>
+
+                <td className="px-8 py-6">
+                  <span className="px-3 py-1 bg-bg-deep border border-border rounded-lg text-[10px] font-black text-text-muted uppercase">
+                    {new Date(expense.expense_date).toLocaleDateString('es-DO')}
+                  </span>
+                </td>
+
+                <td className="px-8 py-6 text-right space-x-3">
+
+                  <button
+                    onClick={() => {
+
+                      setEditingExpenseId(expense.id);
+
+                      setEventId(expense.event_id);
+
+                      setDescript(expense.descript);
+
+                      setAmount(
+                        expense.amount?.toString() || ''
+                      );
+
+                      setPaymentMethod(
+                        Number(expense.payment_method)
+                      );
+
+                      setExpensesStatus(
+                        Boolean(expense.expenses_status)
+                      );
+
+                      setExpenseDate(
+                        new Date(expense.expense_date)
+                          .toISOString()
+                          .split('T')[0]
+                      );
+
+                      setMode('insert');
+                    }}
+                    className="p-2.5 text-text-muted hover:text-primary bg-bg-deep border border-border rounded-xl transition-all"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    onClick={async () => {
+
+                      try {
+
+                        await expensesAPI.delete(expense.id);
+
+                        setExpenses((prev) =>
+                          prev.filter((e) => e.id !== expense.id)
+                        );
+
+                      } catch {
+
+                        alert('No se pudo eliminar el egreso.');
                       }
                     }}
                     className="p-2.5 text-text-muted hover:text-red-400 bg-bg-deep border border-border rounded-xl transition-all"
