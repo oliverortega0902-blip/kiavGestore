@@ -10,6 +10,7 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
 
   try {
     const response = await fetch(url, {
+      cache: 'no-store',
       ...options,
       headers: {
         ...headers,
@@ -107,6 +108,35 @@ export const usersAPI = {
   delete: (id: number) => fetchAPI(`/users/${id}`, { method: 'DELETE' }),
 };
 
+
+export const eventEmployeesAPI = {
+
+  getAll: () =>
+    fetchAPI('/eventEmployees'),
+
+  getById: (id: number) =>
+    fetchAPI(`/eventEmployees/${id}`),
+
+  getByEvent: (eventId: number) =>
+    fetchAPI(`/eventEmployees/${eventId}`),
+
+  create: (data: any) =>
+    fetchAPI('/eventEmployees/add', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (data: any) =>
+    fetchAPI('/eventEmployees/edit', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: number) =>
+    fetchAPI(`/eventEmployees/${id}`, {
+      method: 'DELETE',
+    }),
+};
 
 //---------------------------------------------Clientes---------------------------------------------//
 

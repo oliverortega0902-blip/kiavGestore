@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
 import {
   eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI,
-  clientTypesAPI, paymentMethodsAPI
+  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI
 } from './api';
 
 export default function App() {
@@ -19,7 +19,9 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeSection) {
-      case 'dashboard': return <DashboardOverview />;
+      case 'dashboard': return <DashboardOverview setSection={function (section: string): void {
+        throw new Error('Function not implemented.');
+      }} />;
       case 'events': return <EventsList />;
       case 'inventory': return <InventoryList />;
       case 'employees': return <EmployeeList />;
@@ -218,7 +220,7 @@ function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode, labe
   );
 }
 
-// ─── EVENTOS ──────────────────────────────────────────────────────────────── ¡¡¡¡NO TOCAR NUNCA MAS!!!!
+// ─── EVENTOS ──────────────────────────────────────────────────────────────── NO TOCAR NUNCA
 
 function EventsList() {
   const [selectedClient, setSelectedClient] = useState<number | string | undefined>();
@@ -232,6 +234,13 @@ function EventsList() {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventService | null>(null);
+
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningEvent, setAssigningEvent] = useState<EventService | null>(null);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  const [assignedRecords, setAssignedRecords] = useState<any[]>([]);
+  const [selectedEmployeeToAdd, setSelectedEmployeeToAdd] = useState<number | undefined>(undefined);
+  const [assignLoading, setAssignLoading] = useState(false);
 
   const [title, setTitle] = useState('');
   const [descript, setDescript] = useState('');
@@ -300,6 +309,70 @@ function EventsList() {
     } catch {
       alert('No se pudo eliminar el evento. Nota: este evento ya tiene facturas registradas. Eliminarlas primero.');
     }
+  };
+
+  const openAssignModal = async (event: EventService) => {
+    setAssignLoading(true);
+    setAssigningEvent(event);
+    setShowAssignModal(true);
+
+    try {
+      const [employeesData, assignedData] = await Promise.all([
+        employeesAPI.getAll(),
+        eventEmployeesAPI.getByEvent(event.id),
+      ]);
+
+      setAllEmployees(employeesData || []);
+      setAssignedRecords(assignedData || []);
+      setSelectedEmployeeToAdd(undefined);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudieron cargar las asignaciones del evento.');
+      setShowAssignModal(false);
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const addEmployeeToEvent = async () => {
+    if (!assigningEvent || !selectedEmployeeToAdd) return;
+    setAssignLoading(true);
+
+    try {
+      await eventEmployeesAPI.create({ event_id: assigningEvent.id, employee_id: selectedEmployeeToAdd });
+      const refreshed = await eventEmployeesAPI.getByEvent(assigningEvent.id);
+      setAssignedRecords(refreshed || []);
+      setSelectedEmployeeToAdd(undefined);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo añadir el empleado al evento.');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const deleteAssignedEmployee = async (recordId: number) => {
+    if (!window.confirm('Eliminar esta asignación?')) return;
+    setAssignLoading(true);
+
+    try {
+      await eventEmployeesAPI.delete(recordId);
+      const refreshed = await eventEmployeesAPI.getByEvent(assigningEvent!.id);
+      setAssignedRecords(refreshed || []);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo eliminar la asignación.');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const closeAssignModal = () => {
+    setShowAssignModal(false);
+    setAssigningEvent(null);
+    setAllEmployees([]);
+    setAssignedRecords([]);
+    setSelectedEmployeeToAdd(undefined);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -414,7 +487,7 @@ function EventsList() {
                 {editingEvent && (
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">
-                      ID del Registro (Referencia Back-end)
+                      ID del Registro
                     </label>
 
                     <input
@@ -577,6 +650,108 @@ function EventsList() {
         )}
       </AnimatePresence>
 
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeAssignModal} />
+          <div className="relative bg-bg-surface border border-border w-full max-w-3xl rounded-[24px] shadow-2xl p-6 overflow-y-auto max-h-[85vh] z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-text-muted mb-1">Evento</p>
+                <input
+                  type="text"
+                  readOnly
+                  value={assigningEvent?.title || ''}
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                />
+              </div>
+              <button onClick={closeAssignModal} className="p-2 rounded-full bg-bg-deep hover:bg-white/10 text-text-muted transition-all">
+                <Plus className="w-5 h-5 rotate-45" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4 mb-6">
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">Empleado</label>
+                <div className="flex gap-2">
+                  <Combobox
+                    options={allEmployees.map((emp) => ({
+                      id: emp.id,
+                      label: emp.fullname || `Empleado #${emp.id}`,
+                    }))}
+                    value={selectedEmployeeToAdd}
+                    onChange={(val) => setSelectedEmployeeToAdd(Number(val))}
+                    placeholder="Seleccionar empleado"
+                  />
+                  <button
+                    className="px-4 py-3 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px]"
+                    onClick={addEmployeeToEvent}
+                    disabled={assignLoading || !selectedEmployeeToAdd}
+                  >
+                    Añadir
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-black uppercase tracking-widest text-text-muted mb-3">Empleados asignados</h4>
+              <div className="overflow-x-auto rounded-3xl border border-border">
+                <table className="min-w-full text-left">
+                  <thead>
+                    <tr className="bg-bg-deep/50 text-[10px] uppercase tracking-[0.24em] text-text-muted">
+                      <th className="px-4 py-3">ID</th>
+                      <th className="px-4 py-3">Nombre</th>
+                      <th className="px-4 py-3">Puesto</th>
+                      <th className="px-4 py-3">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assignedRecords.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-4 py-6 text-sm text-text-muted"
+                        >
+                          No hay empleados asignados a este evento.
+                        </td>
+                      </tr>
+                    ) : (
+                      assignedRecords.map((record: any) => (
+                        <tr
+                          key={record.id}
+                          className="border-t border-border text-sm text-white"
+                        >
+                          <td className="px-4 py-4">
+                            {record.employee_id}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            {record.fullname}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            {record.workstation}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            <button
+                              onClick={() => deleteAssignedEmployee(record.id)}
+                              className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative before:absolute before:left-[35px] before:top-0 before:bottom-0 before:w-0.5 before:bg-gradient-to-b before:from-primary/50 before:via-border before:to-transparent">
         <div className="space-y-6">
           {events.map((event) => (
@@ -584,7 +759,8 @@ function EventsList() {
               key={event.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="flex gap-8 group"
+              onClick={() => handleEdit(event)}
+              className="flex gap-8 group cursor-pointer"
             >
               <div className="w-[70px] shrink-0 flex flex-col items-center pt-1">
                 <div className="w-4 h-4 rounded-full bg-primary border-4 border-bg-deep z-10 group-hover:scale-150 transition-transform" />
@@ -645,14 +821,31 @@ function EventsList() {
 
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
                       <button
-                        onClick={() => handleEdit(event)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(event);
+                        }}
                         className="p-2 bg-bg-deep border border-border rounded-xl text-text-muted hover:text-white transition-all"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
 
                       <button
-                        onClick={() => handleDelete(event.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAssignModal(event);
+                        }}
+                        className="p-2 bg-bg-deep border border-border rounded-xl text-text-muted hover:text-white transition-all"
+                        title="Asignar empleados"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(event.id);
+                        }}
                         className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -666,7 +859,7 @@ function EventsList() {
           ))}
         </div>
       </div>
-    </div>
+    </div >
   );
 }
 
