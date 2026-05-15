@@ -832,7 +832,7 @@ function EventsList() {
                   }))}
                   value={selectedInventoryToAdd}
                   onChange={(val) =>
-                    setSelectedInventoryToAdd(Number(val))
+                    setSelectedInventoryToAdd(String(val))
                   }
                   placeholder="Seleccionar inventario"
                 />

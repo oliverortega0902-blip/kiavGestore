@@ -91,7 +91,7 @@ export const eventItemsAPI = {
     fetchAPI(`/eventItems/${eventId}`),
 
   create: (data: any) =>
-    fetchAPI('/eventItems/add', {
+    fetchAPI('/eventItems/create', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
