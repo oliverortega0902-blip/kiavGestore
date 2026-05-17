@@ -96,4 +96,4 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
-export type Section = 'dashboard' | 'events' | 'inventory' | 'employees' | 'clients' | 'finances';
+export type Section = 'dashboard' | 'events' | 'inventory' | 'employees' | 'clients' | 'finances' | 'expenses' | 'configuration';

@@ -1,30 +1,1182 @@
-import { useState, useEffect } from 'react';
-import Login from './page/Login/Login.jsx';
-import Dashboard from './page/Dashboard.tsx'; // Importamos el nombre corregido
-import Register from './page/Register/Register.tsx';
+import React, { useState, useEffect } from 'react';
+import {
+  LayoutDashboard, Calendar, Boxes, Users, UserCircle, FileText, Search,
+  Plus, Bell, TrendingUp, AlertTriangle, CheckCircle2, Mail, Briefcase,
+  Phone, ShieldCheck, MapPin, Clock, Activity, Filter, ChevronRight,
+  Trash2, Edit, Receipt, List, ArrowRight, ChevronDown
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
+import {
+  eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI,
+  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI
+} from './api';
 
-function App() {
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+export default function App() {
+  const [activeSection, setActiveSection] = useState<Section>('events');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [financeMode, setFinanceMode] = useState<'insert' | 'list'>('insert');
+  const [expensesMode, setExpensesMode] = useState<'insert' | 'list'>('list');
 
-  useEffect(() => {
-    const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'dashboard': return <DashboardOverview setSection={function (section: string): void {
+        throw new Error('Function not implemented.');
+      }} />;
+      case 'events': return <EventsList />;
+      case 'inventory': return <InventoryList />;
+      case 'employees': return <EmployeeList />;
+      case 'clients': return <ClientList />;
+      case 'finances':
+        return (
+          <FinancesSection
+            mode={financeMode}
+            setMode={setFinanceMode}
+          />
+        );
+      case 'expenses':
+        return (
+          <ExpensesSection
+            mode={expensesMode}
+            setMode={setExpensesMode}
+          />
+        );
+    }
+  };
 
-    window.addEventListener('popstate', handleLocationChange);
-    return () => window.removeEventListener('popstate', handleLocationChange);
-  }, []);
+  return (
+    <div className="flex min-h-screen bg-bg-deep text-text-main font-sans selection:bg-primary/30">
+      {/* Sidebar */}
+      <aside className="w-[260px] bg-bg-sidebar text-text-main flex flex-col fixed h-full z-20 border-r border-border">
+        <div className="p-8">
+          <div className="flex items-center gap-3 mb-12">
+            <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+              <Calendar className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-2xl font-black tracking-tighter text-white">
+              KIAV<span className="text-primary">Gestore</span>
+            </h2>
+          </div>
+          <nav className="space-y-1.5">
+            <NavItem icon={<LayoutDashboard className="w-5 h-5" />} label="Dashboard" active={activeSection === 'dashboard'} onClick={() => setActiveSection('dashboard')} />
+            <NavItem icon={<Calendar className="w-5 h-5" />} label="Eventos" active={activeSection === 'events'} onClick={() => setActiveSection('events')} />
+            <NavItem icon={<Boxes className="w-5 h-5" />} label="Inventario" active={activeSection === 'inventory'} onClick={() => setActiveSection('inventory')} />
+            <NavItem icon={<Users className="w-5 h-5" />} label="Empleados" active={activeSection === 'employees'} onClick={() => setActiveSection('employees')} />
+            <NavItem icon={<UserCircle className="w-5 h-5" />} label="Clientes" active={activeSection === 'clients'} onClick={() => setActiveSection('clients')} />
+            <NavItem icon={<FileText className="w-5 h-5" />} label="Finanzas" active={activeSection === 'finances'} onClick={() => setActiveSection('finances')} />
+            <NavItem
+              icon={<Receipt className="w-5 h-5" />}
+              label="Egresos"
+              active={activeSection === 'expenses'}
+              onClick={() => setActiveSection('expenses')}
+            />
+          </nav>
+        </div>
+        <div className="mt-auto p-6 border-t border-border bg-black/20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xs">EL</div>
+            <div>
+              <p className="text-sm font-bold text-white leading-none">Esteban Lopez</p>
+              <p className="text-[10px] text-primary font-black uppercase tracking-widest mt-1">Admin #20</p>
+            </div>
+          </div>
+        </div>
+      </aside>
 
-  // Si la ruta es /dashboard, renderiza tu panel de K-Daily
-  if (currentPath === '/dashboard') {
-    return <Dashboard />;
-  }
+      <main className="flex-1 ml-[260px] min-h-screen flex flex-col">
+        <header className="h-[80px] bg-bg-deep/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-10 sticky top-0 z-10">
+          <div className="text-[11px] font-black uppercase tracking-[0.2em] text-text-muted">
+            KIAV<span className="text-primary">Gestore</span> <span className="mx-2 text-border">/</span> <span className="text-white uppercase">{activeSection}</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="relative group">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-primary transition-colors" />
+              <input type="text" placeholder="Buscar..." className="pl-11 pr-4 py-2.5 bg-bg-surface border border-border rounded-2xl text-xs font-medium text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 w-72 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            </div>
+            <button className="p-2.5 text-text-muted hover:bg-bg-surface border border-transparent hover:border-border rounded-xl relative transition-all">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-bg-deep animate-pulse"></span>
+            </button>
+          </div>
+        </header>
 
-  // Por defecto muestra el Login
-  return <Login />;
+        <div className="p-10">
+          <AnimatePresence mode="wait">
+            <motion.div key={activeSection} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3 }}>
+              {renderContent()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+    </div>
+  );
 }
 
-export default App;
+// ─── Componente de carga y error reutilizable ───────────────────────────────
+
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-8 h-8 border-4 border-border border-t-primary rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// ─── COMBOBOX CUSTOM ─────────────────────────────────────────────────────────
+
+interface ComboboxOption {
+  id: string | number;
+  label: string;
+  sublabel?: string;
+}
+
+function Combobox({ options, value, onChange, placeholder = "Buscar..." }: {
+  options: ComboboxOption[],
+  value: string | number | undefined,
+  onChange: (val: string | number) => void,
+  placeholder?: string
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const selectedOption = options.find(o => o.id === value);
+  const filteredOptions = query === ""
+    ? options
+    : options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div className="relative">
+      <div
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus-within:border-primary transition-all flex items-center justify-between cursor-pointer group"
+      >
+        <span className={selectedOption ? "text-white font-medium" : "text-text-muted"}>
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-text-muted transition-transform duration-300 ${isOpen ? 'rotate-180' : ''} group-hover:text-primary`} />
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className="absolute left-0 right-0 top-full mt-2 bg-bg-surface border border-border rounded-2xl shadow-2xl z-50 overflow-hidden"
+            >
+              <div className="p-3 border-b border-border bg-black/10">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Escribe para filtrar..."
+                    className="w-full bg-bg-deep/50 border border-border rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-primary/50 transition-all font-medium"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="max-h-60 overflow-y-auto p-1.5 custom-scrollbar">
+                {filteredOptions.length > 0 ? (
+                  filteredOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        onChange(opt.id);
+                        setIsOpen(false);
+                        setQuery("");
+                      }}
+                      className={`w-full text-left p-3 rounded-xl transition-all flex flex-col gap-0.5 group ${value === opt.id ? 'bg-primary text-white' : 'hover:bg-white/5'}`}
+                    >
+                      <span className={`text-xs font-bold ${value === opt.id ? 'text-white' : 'text-white/90'}`}>{opt.label}</span>
+                      {opt.sublabel && (
+                        <span className={`text-[9px] uppercase tracking-widest font-black ${value === opt.id ? 'text-white/60' : 'text-text-muted group-hover:text-primary/60'}`}>
+                          {opt.sublabel}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <div className="p-4 text-center text-[10px] font-black uppercase text-text-muted tracking-widest italic">
+                    Sin resultados
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ErrorMessage({ message }: { message: string }) {
+  return (
+    <div className="flex items-center gap-3 p-6 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm font-medium">
+      <AlertTriangle className="w-5 h-5 shrink-0" />
+      {message}
+    </div>
+  );
+}
+
+// ─── NavItem ────────────────────────────────────────────────────────────────
+
+function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void }) {
+  return (
+    <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${active ? 'bg-primary text-white shadow-xl shadow-primary/20' : 'text-text-muted hover:text-white hover:bg-white/5'}`}>
+      <span className={active ? 'text-white' : 'text-primary/60'}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+// ─── EVENTOS ──────────────────────────────────────────────────────────────── NO TOCAR NUNCA
+
+function EventsList() {
+  const [selectedClient, setSelectedClient] = useState<number | string | undefined>();
+  const [selectedEventType, setSelectedEventType] = useState<number | string | undefined>();
+  const [selectedEventStatus, setSelectedEventStatus] = useState<number | string | undefined>();
+  const [events, setEvents] = useState<EventService[]>([]);
+  const [eventTypes, setEventTypes] = useState<EventType[]>([]);
+  const [eventStatuses, setEventStatuses] = useState<EventStatus[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventService | null>(null);
+
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningEvent, setAssigningEvent] = useState<EventService | null>(null);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  const [assignedRecords, setAssignedRecords] = useState<any[]>([]);
+  const [selectedEmployeeToAdd, setSelectedEmployeeToAdd] = useState<number | undefined>(undefined);
+  const [assignLoading, setAssignLoading] = useState(false);
+
+  const [title, setTitle] = useState('');
+  const [descript, setDescript] = useState('');
+  const [event_date, setEventDate] = useState('');
+  const [e_location, setELocation] = useState('');
+  const [base_price, setBasePrice] = useState('');
+  const [duration_hours, setDurationHours] = useState('');
+
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [inventoryEvent, setInventoryEvent] = useState<EventService | null>(null);
+
+  const [allInventory, setAllInventory] = useState<any[]>([]);
+  const [assignedInventory, setAssignedInventory] = useState<any[]>([]);
+
+  const [selectedInventoryToAdd, setSelectedInventoryToAdd] = useState<string | undefined>(undefined);
+  const [inventoryQuantity, setInventoryQuantity] = useState('1');
+
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      eventsAPI.getAll(),
+      clientsAPI.getAll(),
+      eventTypesAPI.getAll(),
+      eventStatusAPI.getAll()
+    ])
+      .then(([eventsData, clientsData, eventTypesData, eventStatusesData]) => {
+        setEvents(eventsData);
+        setClients(clientsData);
+        setEventTypes(eventTypesData);
+        setEventStatuses(eventStatusesData);
+      })
+      .catch(() => setError('No se pudieron cargar los eventos o los tipos de eventos.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleEdit = (event: EventService) => {
+    setEditingEvent(event);
+
+    setTitle(event.title);
+    setDescript(event.descript || '');
+    setEventDate(
+      new Date(event.event_date).toISOString().slice(0, 16)
+    );
+    setELocation(event.e_location || event.location || '');
+    setBasePrice(event.base_price.toString());
+    setDurationHours((event.duration_hours ?? 0).toString());
+    setSelectedClient(event.customer_id ?? event.client_id ?? event.client ?? undefined);
+    setSelectedEventType(event.event_type ?? event.event_type_id ?? undefined);
+    setSelectedEventStatus(event.e_status ?? event.status ?? undefined);
+
+    setShowModal(true);
+  };
+
+  const handleCreate = () => {
+    setEditingEvent(null);
+
+    setTitle('');
+    setDescript('');
+    setEventDate('');
+    setELocation('');
+    setBasePrice('');
+    setDurationHours('');
+    setSelectedClient(undefined);
+    setSelectedEventType(undefined);
+    setSelectedEventStatus(undefined);
+
+    setShowModal(true);
+  };
+
+  const handleDelete = async (eventId: number) => {
+    if (!window.confirm('¿Eliminar este evento? Esta acción no se puede deshacer.')) return;
+
+    try {
+      await eventsAPI.delete(eventId);
+      setEvents((prev) => prev.filter((ev) => ev.id !== eventId));
+    } catch {
+      alert('No se pudo eliminar el evento. Nota: este evento ya tiene facturas registradas. Eliminarlas primero.');
+    }
+  };
+
+  const openAssignModal = async (event: EventService) => {
+    setAssignLoading(true);
+    setAssigningEvent(event);
+    setShowAssignModal(true);
+
+    try {
+      const [employeesData, assignedData] = await Promise.all([
+        employeesAPI.getAll(),
+        eventEmployeesAPI.getByEvent(event.id),
+      ]);
+
+      setAllEmployees(employeesData || []);
+      setAssignedRecords(assignedData || []);
+      setSelectedEmployeeToAdd(undefined);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudieron cargar las asignaciones del evento.');
+      setShowAssignModal(false);
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const openInventoryModal = async (event: EventService) => {
+    setInventoryLoading(true);
+    setInventoryEvent(event);
+    setShowInventoryModal(true);
+
+    try {
+      const [inventoryData, assignedData] = await Promise.all([
+        inventoryAPI.getAll(),
+        eventItemsAPI.getByEvent(event.id),
+      ]);
+
+      setAllInventory(inventoryData || []);
+      setAssignedInventory(assignedData || []);
+
+      setSelectedInventoryToAdd(undefined);
+      setInventoryQuantity('1');
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo cargar el inventario del evento.');
+      setShowInventoryModal(false);
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+
+  const addEmployeeToEvent = async () => {
+    if (!assigningEvent || !selectedEmployeeToAdd) return;
+    setAssignLoading(true);
+
+    try {
+      await eventEmployeesAPI.create({ event_id: assigningEvent.id, employee_id: selectedEmployeeToAdd });
+      const refreshed = await eventEmployeesAPI.getByEvent(assigningEvent.id);
+      setAssignedRecords(refreshed || []);
+      setSelectedEmployeeToAdd(undefined);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo añadir el empleado al evento.');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const deleteAssignedEmployee = async (recordId: number) => {
+    if (!window.confirm('Eliminar esta asignación?')) return;
+    setAssignLoading(true);
+
+    try {
+      await eventEmployeesAPI.delete(recordId);
+      const refreshed = await eventEmployeesAPI.getByEvent(assigningEvent!.id);
+      setAssignedRecords(refreshed || []);
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo eliminar la asignación.');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const closeAssignModal = () => {
+    setShowAssignModal(false);
+    setAssigningEvent(null);
+    setAllEmployees([]);
+    setAssignedRecords([]);
+    setSelectedEmployeeToAdd(undefined);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!title.trim() || !selectedClient || !selectedEventType || !selectedEventStatus || !event_date.trim() || !e_location.trim()) {
+      alert('Complete todos los campos obligatorios.');
+      return;
+    }
+
+    const payload = {
+      title: title.trim(),
+      descript: descript.trim(),
+      event_date,
+      e_location: e_location.trim(),
+      base_price: Number(base_price) || 0,
+      duration_hours: Number(duration_hours) || 0,
+      event_type: Number(selectedEventType),
+      e_status: Number(selectedEventStatus),
+      customer_id: Number(selectedClient),
+      client: Number(selectedClient),
+      client_id: Number(selectedClient),
+    };
+
+    try {
+      if (editingEvent) {
+        await eventsAPI.update(editingEvent.id, payload);
+        setEvents((prev) =>
+          prev.map((ev) =>
+            ev.id === editingEvent.id ? { ...ev, ...payload } : ev
+          )
+        );
+      } else {
+        const response = await eventsAPI.create(payload);
+        const createdEvent = response?.created || response?.result?.[0] || response?.result?.recordset?.[0] || response;
+
+        if (createdEvent && typeof createdEvent === 'object' && createdEvent.id != null) {
+          setEvents((prev) => [...prev, { ...createdEvent, e_status: Number(createdEvent.e_status) } as EventService]);
+        } else {
+          const refreshedEvents = await eventsAPI.getAll();
+          setEvents(refreshedEvents);
+        }
+      }
+
+      setShowModal(false);
+    } catch {
+      alert('No se pudo guardar el evento.');
+    }
+  };
+
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} />;
+
+  return (
+    <div className="space-y-10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">
+            Cronograma Maestro
+          </h2>
+
+          <p className="text-sm text-text-muted mt-1 font-medium italic">
+            Logística y montajes en tiempo real.
+          </p>
+        </div>
+
+        <button
+          onClick={handleCreate}
+          className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-95 transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          Nuevo Evento
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative bg-bg-surface border border-border w-full max-w-2xl rounded-[32px] shadow-2xl p-8 overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
+                  {editingEvent
+                    ? `Editar Evento #${editingEvent.id}`
+                    : 'Registrar Nuevo Evento'}
+                </h3>
+
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="p-2 hover:bg-white/5 rounded-full text-text-muted transition-colors"
+                >
+                  <Plus className="w-6 h-6 rotate-45" />
+                </button>
+              </div>
+
+              <form
+                className="space-y-6"
+                onSubmit={handleSubmit}
+              >
+                {editingEvent && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1 underline decoration-primary decoration-2 underline-offset-4">
+                      ID del Registro
+                    </label>
+
+                    <input
+                      type="text"
+                      readOnly
+                      value={editingEvent.id}
+                      className="w-full bg-bg-deep/50 border border-border/50 rounded-2xl px-4 py-3 text-sm text-primary font-mono focus:outline-none cursor-not-allowed"
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Título del Evento
+                    </label>
+
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="Ej: Boda Real"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Cliente
+                    </label>
+
+                    <Combobox
+                      options={clients.map(c => ({
+                        id: c.id,
+                        label: c.fullname || c.name || 'Cliente desconocido',
+                        sublabel: `ID: ${c.id}`
+                      }))}
+                      value={selectedClient}
+                      onChange={(val) => setSelectedClient(val)}
+                      placeholder="Seleccionar Cliente"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Tipo de Evento
+                    </label>
+
+                    <Combobox
+                      options={eventTypes.map((type) => ({
+                        id: type.id,
+                        label: type.name || `Tipo ${type.id}`,
+                        sublabel: `ID: ${type.id}`
+                      }))}
+                      value={selectedEventType}
+                      onChange={(val) => setSelectedEventType(val)}
+                      placeholder="Seleccionar Tipo de Evento"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Estado del Evento
+                    </label>
+
+                    <Combobox
+                      options={eventStatuses.map((status) => ({
+                        id: status.id,
+                        label: status.name || `Estado ${status.id}`,
+                        sublabel: `ID: ${status.id}`
+                      }))}
+                      value={selectedEventStatus}
+                      onChange={(val) => setSelectedEventStatus(val)}
+                      placeholder="Seleccionar Estado"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Descripción
+                    </label>
+
+                    <textarea
+                      value={descript}
+                      onChange={(e) => setDescript(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all h-24"
+                      placeholder="Detalles del montaje..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Fecha y Hora
+                    </label>
+
+                    <input
+                      type="datetime-local"
+                      value={event_date}
+                      onChange={(e) => setEventDate(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Ubicación
+                    </label>
+
+                    <input
+                      type="text"
+                      value={e_location}
+                      onChange={(e) => setELocation(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="Salón de eventos..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Presupuesto Base ($)
+                    </label>
+
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={base_price}
+                      onChange={(e) => setBasePrice(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Duración (Horas)
+                    </label>
+
+                    <input
+                      type="number"
+                      value={duration_hours}
+                      onChange={(e) => setDurationHours(e.target.value)}
+                      className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white focus:border-primary transition-all"
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-6">
+                  <button
+                    type="submit"
+                    className="w-full bg-primary text-white py-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/20 hover:scale-[0.98] transition-all"
+                  >
+                    {editingEvent ? 'Guardar Cambios' : 'Confirmar Montaje'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeAssignModal} />
+          <div className="relative bg-bg-surface border border-border w-full max-w-3xl rounded-[24px] shadow-2xl p-6 overflow-y-auto max-h-[85vh] z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-text-muted mb-1">Evento</p>
+                <input
+                  type="text"
+                  readOnly
+                  value={assigningEvent?.title || ''}
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                />
+              </div>
+              <button onClick={closeAssignModal} className="p-2 rounded-full bg-bg-deep hover:bg-white/10 text-text-muted transition-all">
+                <Plus className="w-5 h-5 rotate-45" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4 mb-6">
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">Empleado</label>
+                <div className="flex gap-2">
+                  <Combobox
+                    options={allEmployees.map((emp) => ({
+                      id: emp.id,
+                      label: emp.fullname || `Empleado #${emp.id}`,
+                    }))}
+                    value={selectedEmployeeToAdd}
+                    onChange={(val) => setSelectedEmployeeToAdd(Number(val))}
+                    placeholder="Seleccionar empleado"
+                  />
+                  <button
+                    className="px-4 py-3 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px]"
+                    onClick={addEmployeeToEvent}
+                    disabled={assignLoading || !selectedEmployeeToAdd}
+                  >
+                    Añadir
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-black uppercase tracking-widest text-text-muted mb-3">Empleados asignados</h4>
+              <div className="overflow-x-auto rounded-3xl border border-border">
+                <table className="min-w-full text-left">
+                  <thead>
+                    <tr className="bg-bg-deep/50 text-[10px] uppercase tracking-[0.24em] text-text-muted">
+                      <th className="px-4 py-3">ID</th>
+                      <th className="px-4 py-3">Nombre</th>
+                      <th className="px-4 py-3">Puesto</th>
+                      <th className="px-4 py-3">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assignedRecords.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-4 py-6 text-sm text-text-muted"
+                        >
+                          No hay empleados asignados a este evento.
+                        </td>
+                      </tr>
+                    ) : (
+                      assignedRecords.map((record: any) => (
+                        <tr
+                          key={record.id}
+                          className="border-t border-border text-sm text-white"
+                        >
+                          <td className="px-4 py-4">
+                            {record.employee_id}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            {record.fullname}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            {record.workstation}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            <button
+                              onClick={() => deleteAssignedEmployee(record.id)}
+                              className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showInventoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowInventoryModal(false)}
+          />
+
+          <div className="relative bg-bg-surface border border-border w-full max-w-3xl rounded-[24px] shadow-2xl p-6 overflow-y-auto max-h-[85vh] z-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-text-muted mb-1">
+                  Evento
+                </p>
+
+                <input
+                  type="text"
+                  readOnly
+                  value={inventoryEvent?.title || ''}
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                />
+              </div>
+
+              <button
+                onClick={() => setShowInventoryModal(false)}
+                className="p-2 rounded-full bg-bg-deep hover:bg-white/10 text-text-muted transition-all"
+              >
+                <Plus className="w-5 h-5 rotate-45" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1.4fr_1fr_120px] gap-4 mb-6">
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
+                  Inventario
+                </label>
+
+                <Combobox
+                  options={allInventory.map((item) => ({
+                    id: item.id,
+                    label: item.element || `Inventario #${item.id}`,
+                  }))}
+                  value={selectedInventoryToAdd}
+                  onChange={(val) =>
+                    setSelectedInventoryToAdd(String(val))
+                  }
+                  placeholder="Seleccionar inventario"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
+                  Cantidad
+                </label>
+
+                <input
+                  type="number"
+                  min="1"
+                  value={inventoryQuantity}
+                  onChange={(e) =>
+                    setInventoryQuantity(e.target.value)
+                  }
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                />
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  className="w-full px-4 py-3 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px]"
+                  onClick={async () => {
+                    if (
+                      !inventoryEvent ||
+                      !selectedInventoryToAdd
+                    ) return;
+
+                    try {
+                      setInventoryLoading(true);
+
+                      await eventItemsAPI.create({
+                        event: inventoryEvent.id,
+                        inventory: selectedInventoryToAdd,
+                        quantity: Number(inventoryQuantity),
+                      });
+
+                      const refreshed =
+                        await eventItemsAPI.getByEvent(
+                          inventoryEvent.id
+                        );
+
+                      setAssignedInventory(refreshed || []);
+                      setSelectedInventoryToAdd(undefined);
+                      setInventoryQuantity('1');
+                    } catch (err) {
+                      console.error(err);
+                      alert(
+                        'No se pudo añadir el inventario.'
+                      );
+                    } finally {
+                      setInventoryLoading(false);
+                    }
+                  }}
+                  disabled={
+                    inventoryLoading ||
+                    !selectedInventoryToAdd
+                  }
+                >
+                  Añadir
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-black uppercase tracking-widest text-text-muted mb-3">
+                Inventario asignado
+              </h4>
+
+              <div className="overflow-x-auto rounded-3xl border border-border">
+                <table className="min-w-full text-left">
+                  <thead>
+                    <tr className="bg-bg-deep/50 text-[10px] uppercase tracking-[0.24em] text-text-muted">
+                      <th className="px-4 py-3">ID</th>
+                      <th className="px-4 py-3">Elemento</th>
+                      <th className="px-4 py-3">Cantidad</th>
+                      <th className="px-4 py-3">Acción</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {assignedInventory.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-4 py-6 text-sm text-text-muted"
+                        >
+                          No hay inventario asignado.
+                        </td>
+                      </tr>
+                    ) : (
+                      assignedInventory.map((record: any) => (
+                        <tr
+                          key={record.id}
+                          className="border-t border-border text-sm text-white"
+                        >
+                          <td className="px-4 py-4">
+                            {record.inventory}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            {record.element}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            {record.quantity}
+                          </td>
+
+                          <td className="px-4 py-4">
+                            <button
+                              onClick={async () => {
+                                if (
+                                  !window.confirm(
+                                    'Eliminar esta asignación?'
+                                  )
+                                ) return;
+
+                                try {
+                                  setInventoryLoading(true);
+
+                                  await eventItemsAPI.delete(
+                                    record.id
+                                  );
+
+                                  const refreshed =
+                                    await eventItemsAPI.getByEvent(
+                                      inventoryEvent!.id
+                                    );
+
+                                  setAssignedInventory(
+                                    refreshed || []
+                                  );
+                                } catch (err) {
+                                  console.error(err);
+                                  alert(
+                                    'No se pudo eliminar.'
+                                  );
+                                } finally {
+                                  setInventoryLoading(false);
+                                }
+                              }}
+                              className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="relative before:absolute before:left-[35px] before:top-0 before:bottom-0 before:w-0.5 before:bg-gradient-to-b before:from-primary/50 before:via-border before:to-transparent">
+        <div className="space-y-6">
+          {events.map((event) => (
+            <motion.div
+              key={event.id}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onClick={() => handleEdit(event)}
+              className="flex gap-8 group cursor-pointer"
+            >
+              <div className="w-[70px] shrink-0 flex flex-col items-center pt-1">
+                <div className="w-4 h-4 rounded-full bg-primary border-4 border-bg-deep z-10 group-hover:scale-150 transition-transform" />
+              </div>
+
+              <div className="flex-1 bg-bg-surface rounded-3xl border border-border hover:border-primary/40 p-6 transition-all group-hover:bg-bg-deep/40">
+                <div className="flex justify-between items-start">
+
+                  <div>
+                    <h3 className="text-base font-bold text-white group-hover:text-primary transition-colors">
+                      {event.title}
+                    </h3>
+
+                    <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/80 mt-2">
+                      {event.event_type_name || event.event_type_label || eventTypes.find((type) => type.id === (event.event_type ?? event.event_type_id))?.name || 'Tipo no asignado'}
+                    </p>
+
+                    <p className="text-[11px] text-text-muted mt-1 leading-relaxed line-clamp-2 max-w-xl">
+                      {event.descript}
+                    </p>
+
+                    <div className="flex items-center gap-4 mt-4 text-[9px] font-black text-text-muted uppercase tracking-widest">
+                      <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded-lg">
+                        <Clock className="w-3 h-3 text-primary/60" />
+                        {new Date(event.event_date).toLocaleDateString('es-DO', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric'
+                        })}
+                      </span>
+
+                      <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded-lg">
+                        <MapPin className="w-3 h-3 text-primary/60" />
+                        {event.e_location}
+                      </span>
+
+                      <span className="flex items-center gap-1.5 bg-black/20 px-2.5 py-1 rounded-lg">
+                        <Activity className="w-3 h-3 text-primary/60" />
+                        {event.duration_hours}h
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-3">
+                    <span className="text-[8px] font-black uppercase bg-primary/10 text-primary border border-primary/20 px-3 py-1 rounded-full tracking-widest">
+                      {eventStatuses.find((status) => status.id === Number(event.e_status))?.name || `E-#${event.e_status}`}
+                    </span>
+
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-text-muted uppercase tracking-widest mb-0.5">
+                        Monto Base
+                      </p>
+
+                      <span className="text-base font-black text-white">
+                        ${event.base_price.toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEdit(event);
+                        }}
+                        className="p-2 bg-bg-deep border border-border rounded-xl text-text-muted hover:text-white transition-all"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAssignModal(event);
+                        }}
+                        className="p-2 bg-bg-deep border border-border rounded-xl text-text-muted hover:text-white transition-all"
+                        title="Asignar empleados"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(event.id);
+                        }}
+                        className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openInventoryModal(event);
+                        }}
+                        className="p-2 bg-bg-deep border border-border rounded-xl text-text-muted hover:text-white transition-all"
+                        title="Asignar inventario"
+                      >
+                        <Boxes className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                  </div>
+
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </div >
+  );
+}
+
+
+// ─── INVENTARIO ───────────────────────────────────────────────────────────── NO TOOCAR NUNCAAAAAA!!!!!
+
+function InventoryList() {
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [elementStatuses, setElementStatuses] = useState<EventStatus[]>([]);
+
+  const [selectedElementStatus, setSelectedElementStatus] = useState<number | undefined>();
+  const [selectedCondition, setSelectedCondition] = useState<number | undefined>();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+
+  // FORM STATES
+  const [element, setElement] = useState('');
+  const [actualPrice, setActualPrice] = useState('');
+  const [stockActual, setStockActual] = useState('');
+  const [stockAlert, setStockAlert] = useState('');
+
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [inventoryEvent, setInventoryEvent] = useState<EventService | null>(null);
+
+  const [allInventory, setAllInventory] = useState<any[]>([]);
+  const [assignedInventory, setAssignedInventory] = useState<any[]>([]);
+
+  const [selectedInventoryToAdd, setSelectedInventoryToAdd] = useState<number | undefined>(undefined);
+
+  const [inventoryQuantity, setInventoryQuantity] = useState('1');
+
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      inventoryAPI.getAll(),
+      elementStatusAPI.getAll()
+    ])
+      .then(([inventoryData, statusData]) => {
+        setInventory(inventoryData);
+        setElementStatuses(statusData);
+      })
+      .catch(() => {
+        setError('No se pudo cargar el inventario o los estados.');
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   const resetForm = () => {
     setElement('');
     setActualPrice('');
@@ -289,7 +1441,7 @@ export default App;
           </h2>
 
           <p className="text-sm text-text-muted font-medium">
-            Control físico y reposición de recursos de K-DAILY.
+            Control físico y reposición de recursos de KIAVGestore.
           </p>
         </div>
 
@@ -572,8 +1724,7 @@ export default App;
             </p>
 
             <p className="text-xs text-text-muted mb-5">
-              Precio actual: $
-              {item.actual_price}
+              Precio actual: {formatMoney(item.actual_price, currency)}
             </p>
 
             <div className="grid grid-cols-2 gap-3 pt-5 border-t border-border/40">
@@ -1117,7 +2268,7 @@ function EmployeeList() {
           </h2>
 
           <p className="text-sm text-text-muted font-medium italic">
-            Talento humano y asignaciones de K-DAILY.
+            Talento humano y asignaciones de KIAVGestore.
           </p>
         </div>
 
@@ -1667,7 +2818,7 @@ function ClientList() {
           </h2>
 
           <p className="text-sm text-text-muted font-medium italic">
-            Relaciones comerciales y corporativas de K-DAILY.
+            Relaciones comerciales y corporativas de KIAVGestore.
           </p>
         </div>
 
@@ -1962,6 +3113,7 @@ function DashboardOverview({
 }: {
   setSection: (section: string) => void;
 }) {
+  const { currency } = useAppSettings();
 
   const [events, setEvents] = useState<EventService[]>([]);
   const [alerts, setAlerts] = useState<InventoryAlert[]>([]);
@@ -2022,11 +3174,7 @@ function DashboardOverview({
       0
     );
 
-  const formattedRevenue =
-    new Intl.NumberFormat('es-DO', {
-      style: 'currency',
-      currency: 'DOP'
-    }).format(totalRevenue);
+  const formattedRevenue = formatMoney(totalRevenue, currency);
 
   const totalExpenses =
     expenses.reduce(
@@ -2035,19 +3183,11 @@ function DashboardOverview({
       0
     );
 
-  const formattedExpenses =
-    new Intl.NumberFormat('es-DO', {
-      style: 'currency',
-      currency: 'DOP'
-    }).format(totalExpenses);
+  const formattedExpenses = formatMoney(totalExpenses, currency);
 
   const netFlow = totalRevenue - totalExpenses;
 
-  const formattedFlow =
-    new Intl.NumberFormat('es-DO', {
-      style: 'currency',
-      currency: 'DOP'
-    }).format(netFlow);
+  const formattedFlow = formatMoney(netFlow, currency);
 
   return (
 
@@ -2102,18 +3242,14 @@ function DashboardOverview({
 
         <StatCard
           title="Ingreso Esperado"
-          value={
-            new Intl.NumberFormat('es-DO', {
-              style: 'currency',
-              currency: 'DOP'
-            }).format(
-              events.reduce(
-                (acc: number, event: any) =>
-                  acc + Number(event.base_price || 0),
-                0
-              )
-            )
-          }
+          value={formatMoney(
+            events.reduce(
+              (acc: number, event: any) =>
+                acc + Number(event.base_price || 0),
+              0
+            ),
+            currency
+          )}
 
           trend="Eventos Programados"
           icon={
@@ -2304,6 +3440,7 @@ function FinancesSection({
   mode: 'insert' | 'list',
   setMode: (m: 'insert' | 'list') => void
 }) {
+  const { currency } = useAppSettings();
 
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
@@ -2709,7 +3846,7 @@ function FinancesSection({
                 </td>
 
                 <td className="px-8 py-6 text-sm font-black text-white">
-                  ${Number(invoice.amount).toLocaleString()}
+                  {formatMoney(invoice.amount, currency)}
                 </td>
 
                 <td className="px-8 py-6">
@@ -2774,6 +3911,189 @@ function FinancesSection({
     </div>
   );
 }
+// ─── CONFIGURACIÓN ─────────────────────────────────────────────────────────
+
+function ConfigurationSection() {
+  const { theme, setTheme, currency, setCurrency } = useAppSettings();
+  const [activeTab, setActiveTab] = useState<'tema' | 'empresa' | 'moneda' | 'metodos' | 'backup' | 'usuarios' | 'servidor'>('tema');
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(true);
+
+  useEffect(() => {
+    paymentMethodsAPI.getAll()
+      .then((data) => setPaymentMethods(data || []))
+      .catch(() => setPaymentMethods([]))
+      .finally(() => setLoadingPayments(false));
+  }, []);
+
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+  const tabs = [
+    { key: 'tema', label: 'Tema' },
+    { key: 'empresa', label: 'Empresa/Negocio' },
+    { key: 'moneda', label: 'Moneda' },
+    { key: 'metodos', label: 'Métodos de pago' },
+    { key: 'backup', label: 'Backup BD' },
+    { key: 'usuarios', label: 'Usuarios y permisos' },
+    { key: 'servidor', label: 'Datos del servidor' },
+  ] as const;
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Configuración</h2>
+          <p className="text-sm text-text-muted mt-1 font-medium italic">Ajustes generales del sistema y parámetros básicos.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[240px_1fr] gap-8">
+        <aside className="bg-bg-surface border border-border rounded-3xl p-6 space-y-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`w-full text-left p-4 rounded-3xl transition-all border ${activeTab === tab.key ? 'border-primary bg-primary/10 text-white' : 'border-border bg-bg-deep text-text-muted hover:border-primary hover:text-white'}`}
+            >
+              <span className="text-[11px] font-black uppercase tracking-[0.2em]">{tab.label}</span>
+            </button>
+          ))}
+        </aside>
+
+        <section className="bg-bg-surface border border-border rounded-3xl p-10 space-y-8">
+          {activeTab === 'tema' && (
+            <div className="space-y-6">
+              <h3 className="text-2xl font-black text-white uppercase">Tema</h3>
+              <p className="text-text-muted">Selecciona la apariencia principal del sistema.</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Tema</label>
+                  <select
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value as 'dark' | 'light')}
+                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                  >
+                    <option value="dark">Oscuro</option>
+                    <option value="light">Claro</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'empresa' && (
+            <div className="space-y-6">
+              <h3 className="text-2xl font-black text-white uppercase">Empresa / Negocio</h3>
+              <p className="text-text-muted">Datos de la empresa.</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <input type="text" value="KIAV" readOnly className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
+                <input type="text" value="RUC" readOnly className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
+                <input type="text" value="Dirección" readOnly className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
+                <input type="text" value="Teléfono" readOnly className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'moneda' && (
+            <div className="space-y-6">
+              <h3 className="text-2xl font-black text-white uppercase">Moneda</h3>
+              <p className="text-text-muted">La moneda por defecto es el Peso Dominicano (DOP). Si seleccionas USD, las cifras mostradas se dividirán entre 59.</p>
+              <div className="max-w-md space-y-3">
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value as 'DOP' | 'USD')}
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white"
+                >
+                  <option value="DOP">DOP - Peso Dominicano</option>
+                  <option value="USD">USD - Dólar</option>
+                </select>
+                <div className="p-6 border border-dashed border-border rounded-3xl text-text-muted">
+                  Si el dólar está activo, todos los valores visibles se muestran con la conversión aplicada.
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {activeTab === 'metodos' && (
+            <div className="space-y-6">
+              <h3 className="text-2xl font-black text-white uppercase">Métodos de pago</h3>
+              <p className="text-text-muted">Métodos disponibles para facturación y cobros.</p>
+              <div className="bg-bg-deep border border-border rounded-3xl p-6">
+                {loadingPayments ? (
+                  <p className="text-text-muted">Cargando métodos de pago...</p>
+                ) : paymentMethods.length === 0 ? (
+                  <p className="text-text-muted">No hay métodos de pago registrados.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {paymentMethods.map((method) => (
+                      <li key={method.id} className="rounded-3xl border border-border p-4 bg-black/20">
+                        <p className="text-sm font-black text-white">{method.payment_type || 'Tipo desconocido'}</p>
+                        <p className="text-[11px] text-text-muted mt-1">{method.descript || 'Sin descripción'}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'backup' && (
+            <div className="space-y-6">
+              <h3 className="text-2xl font-black text-white uppercase">Backup BD</h3>
+              <p className="text-text-muted">Plan de respaldo de la base de datos.</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <button className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4" disabled>Crear respaldo</button>
+                <button className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4" disabled>Restaurar respaldo</button>
+              </div>
+              <div className="p-6 border border-dashed border-border rounded-3xl text-text-muted">
+                La funcionalidad estará disponible en próximas versiones.
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'usuarios' && (
+            <div className="space-y-6">
+              <h3 className="text-2xl font-black text-white uppercase">Usuarios y permisos</h3>
+              <p className="text-text-muted">Gestión de cuentas y roles del sistema.</p>
+              <div className="p-8 border border-dashed border-border rounded-3xl min-h-[220px] flex flex-col items-center justify-center text-text-muted">
+                Contenido pendiente. Todo lo relacionado con inicio de sesión se completará después.
+              </div>
+            </div>
+          )}
+
+
+
+          {activeTab === 'servidor' && (
+            <div className="space-y-6">
+              <h3 className="text-2xl font-black text-white uppercase">Datos del servidor</h3>
+              <p className="text-text-muted">Información básica de conexión al backend.</p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">URL / API</label>
+                  <input value={apiUrl} readOnly className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Puerto</label>
+                  <input value="3001" readOnly className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Descripción</label>
+                  <textarea
+                    value="Este servidor provee los datos de la aplicación desde el puerto 3001. Aquí se obtiene información de eventos, facturas, egresos, inventario, usuarios, métodos de pago y demás módulos. Debes mantener el backend en 3001 para que la aplicación pueda sincronizar los datos correctamente con el frontend."
+                    readOnly
+                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white h-32"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
 
 //-----------------------------------------------Egresos---------------------------------------------//
 // ─── EGRESOS ───────────────────────────────────────────────────────────────
@@ -2785,6 +4105,7 @@ function ExpensesSection({
   mode: 'insert' | 'list',
   setMode: (m: 'insert' | 'list') => void
 }) {
+  const { currency } = useAppSettings();
 
   const [expenses, setExpenses] = useState<any[]>([]);
 
@@ -3203,7 +4524,7 @@ function ExpensesSection({
                 </td>
 
                 <td className="px-8 py-6 text-sm font-black text-white">
-                  ${Number(expense.amount).toLocaleString()}
+                  {formatMoney(expense.amount, currency)}
                 </td>
 
                 <td className="px-8 py-6">
