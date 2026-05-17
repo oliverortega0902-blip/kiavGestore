@@ -77,7 +77,7 @@ export const getAllExpenses = async (req, res) => {
     const pool = getPool();
 
     const result = await pool.request()
-      .query("SELECT * FROM vw_expenses ORDER BY title");
+      .query("SELECT * FROM vw_expenses ORDER BY event_name");
 
     res.json(result.recordset);
 
