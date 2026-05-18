@@ -3984,11 +3984,14 @@ function ConfigurationSection() {
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Tema</label>
                   <select
                     value={theme}
-                    onChange={(e) => setTheme(e.target.value as 'dark' | 'light')}
-                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                    onChange={(e) => setTheme(e.target.value as ThemeOption)}
+                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-text-main"
                   >
-                    <option value="dark">Oscuro</option>
-                    <option value="light">Claro</option>
+                    <option value="dark">Oscuro actual</option>
+                    <option value="beige-light">Claro beige</option>
+                    <option value="blue-light">Claro azul</option>
+                    <option value="beige-dark">Oscuro beige</option>
+                    <option value="light-dark">Oscuro con colores claros</option>
                   </select>
                 </div>
               </div>

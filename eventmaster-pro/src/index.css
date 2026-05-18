@@ -20,21 +20,79 @@
   --shadow-premium: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
 }
 
-.light-theme {
-  --color-bg-deep: #faf4ee;
-  --color-bg-surface: #fcfbf8;
-  --color-bg-sidebar: #f7f1ec;
-  --color-primary: #f39e84;
-  --color-primary-soft: rgba(243, 158, 132, 0.18);
-  --color-text-main: #111111;
-  --color-text-muted: #111111;
-  --color-border: #e5d9d2;
-  --color-success: #16a34a;
+.theme-dark {
+  --color-bg-deep: #0f1115;
+  --color-bg-surface: #1b2028;
+  --color-bg-sidebar: #161a1f;
+  --color-primary: #6366f1;
+  --color-primary-soft: rgba(99, 102, 241, 0.1);
+  --color-text-main: #e2e8f0;
+  --color-text-muted: #94a3b8;
+  --color-border: #2d3748;
+  --color-success: #10b981;
   --color-warning: #f59e0b;
-  --color-danger: #dc2626;
+  --color-danger: #ef4444;
 }
 
-.light-theme [class*="text-white"] {
+.theme-beige-light {
+  --color-bg-deep: #f5efe7;
+  --color-bg-surface: #fbf6f1;
+  --color-bg-sidebar: #ede3d8;
+  --color-primary: #c89678;
+  --color-primary-soft: rgba(200, 150, 120, 0.18);
+  --color-text-main: #111111;
+  --color-text-muted: #5c5046;
+  --color-border: #dec9b7;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #b91c1c;
+}
+
+.theme-blue-light {
+  --color-bg-deep: #eff4ff;
+  --color-bg-surface: #f8fbff;
+  --color-bg-sidebar: #e7efff;
+  --color-primary: #6366f1;
+  --color-primary-soft: rgba(99, 102, 241, 0.16);
+  --color-text-main: #0f172a;
+  --color-text-muted: #475569;
+  --color-border: #cbd5e1;
+  --color-success: #0f766e;
+  --color-warning: #f59e0b;
+  --color-danger: #b91c1c;
+}
+
+.theme-beige-dark {
+  --color-bg-deep: #201b18;
+  --color-bg-surface: #2d2722;
+  --color-bg-sidebar: #1f1a17;
+  --color-primary: #d8b49d;
+  --color-primary-soft: rgba(216, 180, 157, 0.18);
+  --color-text-main: #f7efe8;
+  --color-text-muted: #c9b0a0;
+  --color-border: #3b302a;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+}
+
+.theme-light-dark {
+  --color-bg-deep: #0c0f14;
+  --color-bg-surface: #161b20;
+  --color-bg-sidebar: #11151a;
+  --color-primary: #f39e84;
+  --color-primary-soft: rgba(243, 158, 132, 0.18);
+  --color-text-main: #f3ede8;
+  --color-text-muted: #d7c5bc;
+  --color-border: #2b2320;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+}
+
+.theme-beige-light [class*="text-white"],
+.theme-blue-light [class*="text-white"],
+.theme-light-dark [class*="text-white"] {
   color: var(--color-text-main) !important;
 }
 
