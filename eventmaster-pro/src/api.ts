@@ -18,11 +18,64 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    const text = await response.text();
+    let data: any = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (e) {
+      data = text;
     }
 
-    return await response.json();
+    if (!response.ok) {
+      const findStringInObject = (obj: any): string | null => {
+        if (!obj) return null;
+        if (typeof obj === 'string') return obj;
+        if (typeof obj !== 'object') return null;
+        if (Array.isArray(obj)) {
+          for (const v of obj) {
+            const r = findStringInObject(v);
+            if (r) return r;
+          }
+          return null;
+        }
+        // object
+        for (const key of Object.keys(obj)) {
+          const val = obj[key];
+          if (typeof val === 'string' && val.trim()) return val;
+          const r = findStringInObject(val);
+          if (r) return r;
+        }
+        return null;
+      };
+
+      let serverMessage: any = text || `${response.status} ${response.statusText}`;
+      if (data && typeof data === 'object') {
+        const candidates = ['message', 'msg', 'error', 'detail', 'description', 'sqlmessage', 'hint'];
+        for (const k of candidates) {
+          if (data[k]) {
+            serverMessage = data[k];
+            break;
+          }
+        }
+
+        if (!serverMessage || typeof serverMessage === 'object') {
+          const found = findStringInObject(data);
+          if (found) serverMessage = found;
+          else serverMessage = JSON.stringify(data);
+        }
+      }
+
+      // log concise info for debugging (avoid dumping raw ODBC or stacks)
+      try {
+        console.error('API error', { url, status: response.status, statusText: response.statusText, serverMessage });
+      } catch (e) {
+        console.error('API error (failed to log details)');
+      }
+
+      throw new Error(String(serverMessage));
+    }
+
+    return data;
   } catch (error) {
     console.error(`API request failed for ${endpoint}:`, error);
     throw error;

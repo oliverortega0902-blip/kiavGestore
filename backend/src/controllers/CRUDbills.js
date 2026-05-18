@@ -1,5 +1,18 @@
 import { getPool, sql } from "../configuration/db.js";
 
+const extractShortMessage = (input) => {
+  if (!input) return 'Error desconocido';
+  let s = typeof input === 'string' ? input : String(input);
+  // take first non-empty line
+  const firstLine = s.split(/\r?\n/).map(l => l.trim()).find(l => l && l.length > 0) || s;
+  // if contains colon parts, prefer last segment (often the DB message)
+  const parts = firstLine.split(':');
+  let candidate = parts.length > 1 ? parts[parts.length - 1].trim() : firstLine.trim();
+  // remove long parenthetical technical details
+  candidate = candidate.replace(/\([^)]*\)/g, '').replace(/\s{2,}/g, ' ').trim();
+  return candidate || 'Error desconocido';
+};
+
 // CREATE
 export const createBill = async (req, res) => {
   try {
@@ -14,7 +27,7 @@ export const createBill = async (req, res) => {
     res.json({ message: "Factura creada ✅", result: result.recordset });
   } catch (error) {
     console.error("Error:", error.message || error);
-    res.status(500).json({ message: "Error al crear factura ❌", error: error.message });
+    res.status(500).json({ message: 'vulneracion de seguridad y legalidad' });
   }
 };
 
@@ -33,7 +46,7 @@ export const editBill = async (req, res) => {
     res.json({ message: "Factura actualizada ✅", result: result.recordset });
   } catch (error) {
     console.error("Error:", error.message || error);
-    res.status(500).json({ message: "Error al editar factura ❌", error: error.message });
+    res.status(500).json({ message: 'vulneracion de seguridad y legalidad' });
   }
 };
 
@@ -49,7 +62,7 @@ export const selectBill = async (req, res) => {
     res.json(result.recordset);
   } catch (error) {
     console.error("Error:", error.message || error);
-    res.status(500).json({ message: "Error al obtener factura ❌", error: error.message });
+    res.status(500).json({ message: 'vulneracion de seguridad y legalidad' });
   }
 };
 
@@ -65,7 +78,7 @@ export const deleteBill = async (req, res) => {
     res.json({ message: "Factura eliminada ✅" });
   } catch (error) {
     console.error("Error:", error.message || error);
-    res.status(500).json({ message: "Error al eliminar factura ❌", error: error.message });
+    res.status(500).json({ message: 'vulneracion de seguridad y legalidad' });
   }
 };
 
@@ -79,9 +92,6 @@ export const getAllBills = async (req, res) => {
     res.json(result.recordset);
 
   } catch (error) {
-    res.status(500).json({
-      message: "Error al obtener facturas ❌",
-      error: error.message
-    });
+    res.status(500).json({ message: 'vulneracion de seguridad y legalidad' });
   }
 };

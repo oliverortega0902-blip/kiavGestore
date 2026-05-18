@@ -3564,11 +3564,23 @@ function FinancesSection({
 
       setMode('list');
 
-    } catch (err) {
+    } catch (err: any) {
 
-      console.error(err);
+      console.error('Invoice error catch:', err);
 
-      alert('No se pudo procesar la factura.');
+      const msg = err && (err.message || (err.toString && err.toString()));
+      let display = (msg && String(msg).trim()) ? String(msg).trim() : null;
+      if (!display) {
+        try {
+          // try compact JSON of err
+          const compact = JSON.stringify(err, Object.getOwnPropertyNames(err)).slice(0, 300);
+          display = compact || 'Error desconocido';
+        } catch (e) {
+          display = String(err) || 'Error desconocido';
+        }
+      }
+
+      alert(`No se pudo procesar la factura.\nMensaje: ${display}`);
     }
   };
 
@@ -3674,14 +3686,13 @@ function FinancesSection({
                 </label>
 
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
                   value={amount}
                   onChange={(e) =>
                     setAmount(e.target.value)
                   }
                   placeholder="0.00"
-                  className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-bold"
+                  className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-text-main focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-bold"
                 />
 
               </div>
@@ -3886,9 +3897,11 @@ function FinancesSection({
                           prev.filter((i) => i.id !== invoice.id)
                         );
 
-                      } catch {
+                      } catch (err: any) {
 
-                        alert('No se pudo eliminar la factura.');
+                        console.error(err);
+                        const msg = err && (err.message || (err.toString && err.toString()));
+                        alert(`No se pudo eliminar la factura. ${msg ? '\\nMensaje: ' + msg : ''}`);
                       }
                     }}
                     className="p-2.5 text-text-muted hover:text-red-400 bg-bg-deep border border-border rounded-xl transition-all"
