@@ -1,0 +1,124 @@
+:root {
+    --bg-dark: #0f1113;
+    --card-bg: #161a1d;
+    --accent-purple: #7e7ffc;
+    --text-gray: #94a3b8;
+    --input-bg: #1e2329;
+}
+
+/* El login-wrapper aquí también centra la tarjeta */
+.login-wrapper {
+    background-color: var(--bg-dark);
+    color: white;
+    min-height: 100vh;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.login-card {
+    background-color: var(--card-bg);
+    padding: 40px;
+    border-radius: 28px;
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.logo-box {
+    background: #1e2329;
+    width: 55px;
+    height: 55px;
+    margin: 0 auto 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 14px;
+    font-size: 24px;
+    color: var(--accent-purple);
+}
+
+.logo-text { font-size: 1.4rem; letter-spacing: 3px; margin: 0; }
+.logo-accent { color: #5c62ff; }
+
+.form-title h2 { font-size: 1.1rem; margin: 25px 0 5px; }
+.form-title p { font-size: 0.75rem; color: var(--text-gray); margin-bottom: 30px; margin-top: 0; }
+
+/* Inputs y Campos */
+.input-group { text-align: left; margin-bottom: 20px; }
+.input-group label { font-size: 0.7rem; font-weight: 700; color: var(--text-gray); display: block; margin-bottom: 8px; }
+
+.field {
+    background: var(--input-bg);
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 12px;
+    transition: 0.3s;
+    border: 1px solid transparent;
+    position: relative;
+}
+
+.field:focus-within { border-color: rgba(126, 127, 252, 0.4); }
+
+.field input {
+    background: transparent;
+    border: none;
+    color: white;
+    flex: 1; 
+    margin-left: 12px;
+    outline: none;
+    font-size: 0.9rem;
+    width: 100%;
+}
+
+.field-icon { color: #565d67; font-size: 1.1rem; }
+
+/* Botón del ojo */
+.eye-btn {
+    background: transparent;
+    border: none;
+    color: #565d67;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 10px;
+    display: flex;
+    align-items: center;
+    transition: 0.2s;
+}
+
+.eye-btn:hover { color: var(--accent-purple); }
+
+/* Botón de Registro */
+.register-btn {
+    background: var(--accent-purple);
+    color: white;
+    border: none;
+    width: 100%;
+    padding: 15px;
+    border-radius: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    box-shadow: 0 8px 20px rgba(126, 127, 252, 0.3);
+    transition: 0.3s;
+}
+
+.register-btn:hover { transform: scale(1.02); filter: brightness(1.1); }
+
+/* Estrellas decorativas */
+.sparkle { position: absolute; color: #f1c40f; opacity: 0.6; font-size: 14px; }
+.st-top { top: 20px; right: 25px; }
+.st-bottom { bottom: 20px; left: 25px; }
+
+.form-footer { margin-top: 25px; font-size: 0.85rem; color: var(--text-gray); }
+.signup-link { 
+    color: var(--accent-purple); 
+    text-decoration: none; 
+    font-weight: 600; 
+    cursor: pointer;
+}
