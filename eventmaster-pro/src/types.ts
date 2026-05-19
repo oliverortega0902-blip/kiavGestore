@@ -32,6 +32,7 @@ export interface EventStatus {
 }
 
 export interface InventoryItem {
+  state(state: any): import("react").SetStateAction<number | undefined>;
   id: number;
   name?: string;
   element: string;
@@ -46,6 +47,10 @@ export interface InventoryItem {
 }
 
 export interface Employee {
+  employment_date: any;
+  phone: string;
+  email: string;
+  national_id: string;
   id: number;
   name?: string;
   fullname: string;

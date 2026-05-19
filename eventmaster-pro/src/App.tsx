@@ -137,13 +137,7 @@ export default function App() {
           </div>
           <div className="flex items-center gap-6">
             <div className="relative group">
-              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-primary transition-colors" />
-              <input type="text" placeholder="Buscar..." className="pl-11 pr-4 py-2.5 bg-bg-surface border border-border rounded-2xl text-xs font-medium text-text-main focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 w-72 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
-            <button className="p-2.5 text-text-muted hover:bg-bg-surface border border-transparent hover:border-border rounded-xl relative transition-all">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-primary rounded-full border-2 border-bg-deep animate-pulse"></span>
-            </button>
           </div>
         </header>
 
@@ -1351,16 +1345,6 @@ function InventoryList() {
           payload
         );
 
-        setInventory((prev) =>
-          prev.map((item) =>
-            item.id === editingItem.id
-              ? {
-                ...item,
-                ...payload
-              }
-              : item
-          )
-        );
 
       } else {
 
@@ -2186,7 +2170,6 @@ function EmployeeList() {
 
   const handleEdit = (emp: Employee) => {
     setEditingEmployee(emp);
-
     setFullname(emp.fullname || '');
     setNationalId(emp.national_id || '');
     setEmail(emp.email || '');
@@ -3977,7 +3960,11 @@ function FinancesSection({
 
 function ConfigurationSection() {
   const { theme, setTheme, currency, setCurrency } = useAppSettings();
-  const [activeTab, setActiveTab] = useState<'tema' | 'empresa' | 'moneda' | 'metodos' | 'backup' | 'usuarios' | 'servidor'>('tema');
+
+  const [activeTab, setActiveTab] = useState<
+    'tema' | 'empresa' | 'moneda' | 'metodos' | 'backup' | 'usuarios' | 'servidor'
+  >('tema');
+
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(true);
 
@@ -3988,7 +3975,34 @@ function ConfigurationSection() {
       .finally(() => setLoadingPayments(false));
   }, []);
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+  // ─── APLICAR TEMA GLOBALMENTE ─────────────────────────────────────────────
+
+  useEffect(() => {
+    document.body.classList.remove(
+      'theme-dark',
+      'theme-beige-light',
+      'theme-blue-light',
+      'theme-beige-dark',
+      'theme-light-dark'
+    );
+
+    document.body.classList.add(`theme-${theme}`);
+  }, [theme]);
+
+  // ─── DATOS SERVIDOR ───────────────────────────────────────────────────────
+
+  const apiUrl =
+    import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+  const parsedPort = (() => {
+    try {
+      return new URL(apiUrl).port || '3001';
+    } catch {
+      return '3001';
+    }
+  })();
+
+  // ─── TABS ─────────────────────────────────────────────────────────────────
 
   const tabs = [
     { key: 'tema', label: 'Tema' },
@@ -4002,164 +4016,371 @@ function ConfigurationSection() {
 
   return (
     <div className="space-y-8">
+
+      {/* HEADER */}
+
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">Configuración</h2>
-          <p className="text-sm text-text-muted mt-1 font-medium italic">Ajustes generales del sistema y parámetros básicos.</p>
+          <h2 className="text-4xl font-black text-white tracking-tighter uppercase">
+            Configuración
+          </h2>
+
+          <p className="text-sm text-text-muted mt-1 font-medium italic">
+            Ajustes generales del sistema y parámetros básicos.
+          </p>
         </div>
       </div>
 
+      {/* LAYOUT */}
+
       <div className="grid grid-cols-1 xl:grid-cols-[240px_1fr] gap-8">
+
+        {/* SIDEBAR */}
+
         <aside className="bg-bg-surface border border-border rounded-3xl p-6 space-y-2">
+
           {tabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`w-full text-left p-4 rounded-3xl transition-all border ${activeTab === tab.key ? 'border-primary bg-primary/10 text-white' : 'border-border bg-bg-deep text-text-muted hover:border-primary hover:text-white'}`}
+              className={`w-full text-left p-4 rounded-3xl transition-all border ${
+                activeTab === tab.key
+                  ? 'border-primary bg-primary/10 text-white'
+                  : 'border-border bg-bg-deep text-text-muted hover:border-primary hover:text-white'
+              }`}
             >
-              <span className="text-[11px] font-black uppercase tracking-[0.2em]">{tab.label}</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.2em]">
+                {tab.label}
+              </span>
             </button>
           ))}
+
         </aside>
 
+        {/* CONTENT */}
+
         <section className="bg-bg-surface border border-border rounded-3xl p-10 space-y-8">
+
+          {/* ─── TEMA ───────────────────────────────────────────── */}
+
           {activeTab === 'tema' && (
             <div className="space-y-6">
-              <h3 className="text-2xl font-black text-white uppercase">Tema</h3>
-              <p className="text-text-muted">Selecciona la apariencia principal del sistema.</p>
+
+              <h3 className="text-2xl font-black text-white uppercase">
+                Tema
+              </h3>
+
+              <p className="text-text-muted">
+                Selecciona la apariencia principal del sistema.
+              </p>
+
               <div className="grid gap-4 md:grid-cols-2">
+
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Tema</label>
+
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                    Tema
+                  </label>
+
                   <select
                     value={theme}
-                    onChange={(e) => setTheme(e.target.value as ThemeOption)}
+                    onChange={(e) =>
+                      setTheme(e.target.value as ThemeOption)
+                    }
                     className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-text-main"
                   >
                     <option value="dark">Oscuro actual</option>
                     <option value="beige-light">Claro beige</option>
                     <option value="blue-light">Claro azul</option>
                     <option value="beige-dark">Oscuro beige</option>
-                    <option value="light-dark">Oscuro con colores claros</option>
+                    <option value="light-dark">
+                      Oscuro con colores claros
+                    </option>
                   </select>
+
                 </div>
+
               </div>
+
             </div>
           )}
+
+          {/* ─── EMPRESA ───────────────────────────────────────── */}
 
           {activeTab === 'empresa' && (
             <div className="space-y-6">
-              <h3 className="text-2xl font-black text-white uppercase">Empresa / Negocio</h3>
-              <p className="text-text-muted">Datos de la empresa.</p>
+
+              <h3 className="text-2xl font-black text-white uppercase">
+                Empresa / Negocio
+              </h3>
+
+              <p className="text-text-muted">
+                Datos de la empresa.
+              </p>
+
               <div className="grid gap-4 md:grid-cols-2">
-                <input type="text" value="KIAV" readOnly className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
-                <input type="text" value="RUC" readOnly className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
-                <input type="text" value="Dirección" readOnly className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
-                <input type="text" value="Teléfono" readOnly className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
+
+                <input
+                  type="text"
+                  value="KIAV"
+                  readOnly
+                  className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white"
+                />
+
+                <input
+                  type="text"
+                  value="RUC"
+                  readOnly
+                  className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white"
+                />
+
+                <input
+                  type="text"
+                  value="Dirección"
+                  readOnly
+                  className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white"
+                />
+
+                <input
+                  type="text"
+                  value="Teléfono"
+                  readOnly
+                  className="bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white"
+                />
+
               </div>
+
             </div>
           )}
+
+          {/* ─── MONEDA ───────────────────────────────────────── */}
 
           {activeTab === 'moneda' && (
             <div className="space-y-6">
-              <h3 className="text-2xl font-black text-white uppercase">Moneda</h3>
-              <p className="text-text-muted">La moneda por defecto es el Peso Dominicano (DOP). Si seleccionas USD, las cifras mostradas se dividirán entre 59.</p>
+
+              <h3 className="text-2xl font-black text-white uppercase">
+                Moneda
+              </h3>
+
+              <p className="text-text-muted">
+                La moneda por defecto es el Peso Dominicano (DOP).
+                Si seleccionas USD, las cifras mostradas se dividirán entre 59.
+              </p>
+
               <div className="max-w-md space-y-3">
+
                 <select
                   value={currency}
-                  onChange={(e) => setCurrency(e.target.value as 'DOP' | 'USD')}
+                  onChange={(e) =>
+                    setCurrency(e.target.value as 'DOP' | 'USD')
+                  }
                   className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white"
                 >
-                  <option value="DOP">DOP - Peso Dominicano</option>
-                  <option value="USD">USD - Dólar</option>
+                  <option value="DOP">
+                    DOP - Peso Dominicano
+                  </option>
+
+                  <option value="USD">
+                    USD - Dólar
+                  </option>
                 </select>
+
                 <div className="p-6 border border-dashed border-border rounded-3xl text-text-muted">
-                  Si el dólar está activo, todos los valores visibles se muestran con la conversión aplicada.
+                  Moneda actual:{' '}
+                  <span className="font-black text-white">
+                    {currency}
+                  </span>
                 </div>
+
+                <div className="p-6 border border-dashed border-border rounded-3xl text-text-muted">
+                  Ejemplo de conversión:
+                  <div className="mt-2 text-white font-black">
+                    {formatMoney(5900, currency)}
+                  </div>
+                </div>
+
               </div>
+
             </div>
           )}
 
+          {/* ─── MÉTODOS ─────────────────────────────────────── */}
 
           {activeTab === 'metodos' && (
             <div className="space-y-6">
-              <h3 className="text-2xl font-black text-white uppercase">Métodos de pago</h3>
-              <p className="text-text-muted">Métodos disponibles para facturación y cobros.</p>
+
+              <h3 className="text-2xl font-black text-white uppercase">
+                Métodos de pago
+              </h3>
+
+              <p className="text-text-muted">
+                Métodos disponibles para facturación y cobros.
+              </p>
+
               <div className="bg-bg-deep border border-border rounded-3xl p-6">
+
                 {loadingPayments ? (
-                  <p className="text-text-muted">Cargando métodos de pago...</p>
+                  <p className="text-text-muted">
+                    Cargando métodos de pago...
+                  </p>
                 ) : paymentMethods.length === 0 ? (
-                  <p className="text-text-muted">No hay métodos de pago registrados.</p>
+                  <p className="text-text-muted">
+                    No hay métodos de pago registrados.
+                  </p>
                 ) : (
                   <ul className="space-y-3">
+
                     {paymentMethods.map((method) => (
-                      <li key={method.id} className="rounded-3xl border border-border p-4 bg-black/20">
-                        <p className="text-sm font-black text-white">{method.payment_type || 'Tipo desconocido'}</p>
-                        <p className="text-[11px] text-text-muted mt-1">{method.descript || 'Sin descripción'}</p>
+                      <li
+                        key={method.id}
+                        className="rounded-3xl border border-border p-4 bg-black/20"
+                      >
+                        <p className="text-sm font-black text-white">
+                          {method.payment_type || 'Tipo desconocido'}
+                        </p>
+
+                        <p className="text-[11px] text-text-muted mt-1">
+                          {method.descript || 'Sin descripción'}
+                        </p>
                       </li>
                     ))}
+
                   </ul>
                 )}
+
               </div>
+
             </div>
           )}
+
+          {/* ─── BACKUP ──────────────────────────────────────── */}
 
           {activeTab === 'backup' && (
             <div className="space-y-6">
-              <h3 className="text-2xl font-black text-white uppercase">Backup BD</h3>
-              <p className="text-text-muted">Plan de respaldo de la base de datos.</p>
+
+              <h3 className="text-2xl font-black text-white uppercase">
+                Backup BD
+              </h3>
+
+              <p className="text-text-muted">
+                Plan de respaldo de la base de datos.
+              </p>
+
               <div className="grid gap-4 md:grid-cols-2">
-                <button className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4" disabled>Crear respaldo</button>
-                <button className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4" disabled>Restaurar respaldo</button>
+
+                <button
+                  className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4"
+                  disabled
+                >
+                  Crear respaldo
+                </button>
+
+                <button
+                  className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4"
+                  disabled
+                >
+                  Restaurar respaldo
+                </button>
+
               </div>
+
               <div className="p-6 border border-dashed border-border rounded-3xl text-text-muted">
                 La funcionalidad estará disponible en próximas versiones.
               </div>
+
             </div>
           )}
+
+          {/* ─── USUARIOS ───────────────────────────────────── */}
 
           {activeTab === 'usuarios' && (
             <div className="space-y-6">
-              <h3 className="text-2xl font-black text-white uppercase">Usuarios y permisos</h3>
-              <p className="text-text-muted">Gestión de cuentas y roles del sistema.</p>
+
+              <h3 className="text-2xl font-black text-white uppercase">
+                Usuarios y permisos
+              </h3>
+
+              <p className="text-text-muted">
+                Gestión de cuentas y roles del sistema.
+              </p>
+
               <div className="p-8 border border-dashed border-border rounded-3xl min-h-[220px] flex flex-col items-center justify-center text-text-muted">
                 Contenido pendiente. Todo lo relacionado con inicio de sesión se completará después.
               </div>
+
             </div>
           )}
 
-
+          {/* ─── SERVIDOR ───────────────────────────────────── */}
 
           {activeTab === 'servidor' && (
             <div className="space-y-6">
-              <h3 className="text-2xl font-black text-white uppercase">Datos del servidor</h3>
-              <p className="text-text-muted">Información básica de conexión al backend.</p>
+
+              <h3 className="text-2xl font-black text-white uppercase">
+                Datos del servidor
+              </h3>
+
+              <p className="text-text-muted">
+                Información básica de conexión al backend.
+              </p>
+
               <div className="grid gap-4 md:grid-cols-2">
+
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">URL / API</label>
-                  <input value={apiUrl} readOnly className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
+
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                    URL / API
+                  </label>
+
+                  <input
+                    value={apiUrl}
+                    readOnly
+                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white"
+                  />
+
                 </div>
+
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Puerto</label>
-                  <input value="3001" readOnly className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white" />
+
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                    Puerto
+                  </label>
+
+                  <input
+                    value={parsedPort}
+                    readOnly
+                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white"
+                  />
+
                 </div>
+
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Descripción</label>
+
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                    Descripción
+                  </label>
+
                   <textarea
-                    value="Este servidor provee los datos de la aplicación desde el puerto 3001. Aquí se obtiene información de eventos, facturas, egresos, inventario, usuarios, métodos de pago y demás módulos. Debes mantener el backend en 3001 para que la aplicación pueda sincronizar los datos correctamente con el frontend."
+                    value="Este servidor provee los datos de la aplicación desde el puerto 3001. Aquí se obtiene información de eventos, facturas, egresos, inventario, usuarios, métodos de pago y demás módulos."
                     readOnly
                     className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-4 text-sm text-white h-32"
                   />
+
                 </div>
+
               </div>
+
             </div>
           )}
+
         </section>
+
       </div>
+
     </div>
   );
 }
-
 //-----------------------------------------------Egresos---------------------------------------------//
 // ─── EGRESOS ───────────────────────────────────────────────────────────────
 
@@ -4577,7 +4798,7 @@ function ExpensesSection({
               >
 
                 <td className="px-8 py-6 text-sm font-bold text-white">
-                  {expense.event_name}
+                  {expense.event_title}
                 </td>
 
                 <td className="px-8 py-6 text-sm text-text-muted">
@@ -4626,7 +4847,7 @@ function ExpensesSection({
                       );
 
                       setPaymentMethod(
-                        Number(expense.payment_method)
+                        Number(expense.payment_method_id)
                       );
 
                       setExpensesStatus(

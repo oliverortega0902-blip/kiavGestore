@@ -3,13 +3,14 @@ import { getPool, sql } from "../configuration/db.js";
 // CREATE
 export const createExpense = async (req, res) => {
   try {
-    const { event_id, descript, amount, expenses_status } = req.body;
+    const { event_id, descript, amount, expenses_status, payment_method } = req.body;
     const pool = getPool();
     const result = await pool.request()
       .input("event_id", sql.Int, event_id)
       .input("descript", sql.VarChar, descript)
       .input("amount", sql.Decimal(10,2), amount)
       .input("expenses_status", sql.Bit, expenses_status)
+      .input("payment_method", sql.Int, payment_method)
       .execute("sp_create_spent");
 
     res.json({ message: "Egreso creado ✅", result: result.recordset });
@@ -22,7 +23,7 @@ export const createExpense = async (req, res) => {
 // EDIT
 export const editExpense = async (req, res) => {
   try {
-    const { id, event_id, descript, amount, expenses_status } = req.body;
+    const { id, event_id, descript, amount, expenses_status, payment_method } = req.body;
     const pool = getPool();
     const result = await pool.request()
       .input("id", sql.Int, id)
@@ -30,6 +31,7 @@ export const editExpense = async (req, res) => {
       .input("descript", sql.VarChar, descript)
       .input("amount", sql.Decimal(10,2), amount)
       .input("expenses_status", sql.Bit, expenses_status)
+      .input("payment_method", sql.Int, payment_method)
       .execute("sp_edit_spent");
 
     res.json({ message: "Egreso actualizado ✅", result: result.recordset });
@@ -77,7 +79,7 @@ export const getAllExpenses = async (req, res) => {
     const pool = getPool();
 
     const result = await pool.request()
-      .query("SELECT * FROM vw_expenses ORDER BY event_name");
+      .query("SELECT * FROM vw_expenses ORDER BY event_title");
 
     res.json(result.recordset);
 
