@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext, createContext } from 'react';
 import {
   LayoutDashboard, Calendar, Boxes, Users, UserCircle, FileText, Search,
   Plus, Bell, TrendingUp, AlertTriangle, CheckCircle2, Mail, Briefcase,
   Phone, ShieldCheck, MapPin, Clock, Activity, Filter, ChevronRight,
-  Trash2, Edit, Receipt, List, ArrowRight, ChevronDown
+  Trash2, Edit, Receipt, List, ArrowRight, ChevronDown, Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
@@ -12,17 +12,55 @@ import {
   clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI
 } from './api';
 
+// ─── TIPOS Y HELPERS GLOBALES ────────────────────────────────────────────────
+
+export type ThemeOption = 'dark' | 'beige-light' | 'blue-light' | 'beige-dark' | 'light-dark';
+
+interface AppSettingsContextType {
+  theme: ThemeOption;
+  setTheme: (t: ThemeOption) => void;
+  currency: 'DOP' | 'USD';
+  setCurrency: (c: 'DOP' | 'USD') => void;
+}
+
+const AppSettingsContext = createContext<AppSettingsContextType>({
+  theme: 'dark',
+  setTheme: () => {},
+  currency: 'DOP',
+  setCurrency: () => {},
+});
+
+function useAppSettings() {
+  return useContext(AppSettingsContext);
+}
+
+function formatMoney(value: number | string | undefined | null, currency: 'DOP' | 'USD'): string {
+  const num = Number(value) || 0;
+  if (currency === 'USD') {
+    return `$${(num / 59).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
+  }
+  return `$${num.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DOP`;
+}
+
 export default function App() {
   const [activeSection, setActiveSection] = useState<Section>('events');
   const [searchQuery, setSearchQuery] = useState('');
   const [financeMode, setFinanceMode] = useState<'insert' | 'list'>('insert');
   const [expensesMode, setExpensesMode] = useState<'insert' | 'list'>('list');
 
+  // ── Settings globales ──
+  const [theme, setThemeState] = useState<ThemeOption>(
+    () => (localStorage.getItem('kiav_theme') as ThemeOption) || 'dark'
+  );
+  const [currency, setCurrencyState] = useState<'DOP' | 'USD'>(
+    () => (localStorage.getItem('kiav_currency') as 'DOP' | 'USD') || 'DOP'
+  );
+  const handleSetTheme = (t: ThemeOption) => { setThemeState(t); localStorage.setItem('kiav_theme', t); };
+  const handleSetCurrency = (c: 'DOP' | 'USD') => { setCurrencyState(c); localStorage.setItem('kiav_currency', c); };
+
   const renderContent = () => {
     switch (activeSection) {
-      case 'dashboard': return <DashboardOverview setSection={function (section: string): void {
-        throw new Error('Function not implemented.');
-      }} />;
+      case 'dashboard': return <DashboardOverview setSection={(s) => setActiveSection(s as Section)} />;
       case 'events': return <EventsList />;
       case 'inventory': return <InventoryList />;
       case 'employees': return <EmployeeList />;
@@ -41,10 +79,13 @@ export default function App() {
             setMode={setExpensesMode}
           />
         );
+      case 'configuration':
+        return <ConfigurationSection />;
     }
   };
 
   return (
+    <AppSettingsContext.Provider value={{ theme, setTheme: handleSetTheme, currency, setCurrency: handleSetCurrency }}>
     <div className="flex min-h-screen bg-bg-deep text-text-main font-sans selection:bg-primary/30">
       {/* Sidebar */}
       <aside className="w-[260px] bg-bg-sidebar text-text-main flex flex-col fixed h-full z-20 border-r border-border">
@@ -69,6 +110,12 @@ export default function App() {
               label="Egresos"
               active={activeSection === 'expenses'}
               onClick={() => setActiveSection('expenses')}
+            />
+            <NavItem
+              icon={<Settings className="w-5 h-5" />}
+              label="Configuración"
+              active={activeSection === 'configuration'}
+              onClick={() => setActiveSection('configuration' as Section)}
             />
           </nav>
         </div>
@@ -109,6 +156,7 @@ export default function App() {
         </div>
       </main>
     </div>
+    </AppSettingsContext.Provider>
   );
 }
 
@@ -1132,6 +1180,7 @@ function EventsList() {
 // ─── INVENTARIO ───────────────────────────────────────────────────────────── NO TOOCAR NUNCAAAAAA!!!!!
 
 function InventoryList() {
+  const { currency } = useAppSettings();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [elementStatuses, setElementStatuses] = useState<EventStatus[]>([]);
 
