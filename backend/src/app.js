@@ -22,6 +22,7 @@ import rolesRoutes from "./routes/roles.js";
 import userRolesRoutes from "./routes/user_roles.js";
 import usersRoutes from "./routes/users.js";
 import workstationsRoutes from "./routes/workstations.js";
+import backupRoutes from "./routes/backupruta.js";
 
 const app = express();
 
@@ -59,7 +60,8 @@ app.use("/api/roles", rolesRoutes);
 app.use("/api/userRoles", userRolesRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/workstations", workstationsRoutes);
-
+console.log("IMPORT BACKUP:", backupRoutes);
+app.use("/api/backup", backupRoutes);
 // Manejo de rutas no encontradas
 app.use((req, res) => {
   res.status(404).json({

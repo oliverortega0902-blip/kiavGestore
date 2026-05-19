@@ -327,3 +327,18 @@ export const expensesAPI = {
       method: 'DELETE',
     }),
 };
+
+//---------------------------------------------backups---------------------------------------------//
+export const backupAPI = {
+
+  createFull: () =>
+    fetchAPI('/backup/full', {
+      method: 'POST',
+    }),
+
+  createLog: () =>
+    fetchAPI('/backup/log', {
+      method: 'POST',
+    }),
+
+};

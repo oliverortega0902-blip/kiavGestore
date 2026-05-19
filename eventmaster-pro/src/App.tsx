@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
 import {
   eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI,
-  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI
+  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI, backupAPI
 } from './api';
 
 // ─── TIPOS Y HELPERS GLOBALES ────────────────────────────────────────────────
@@ -25,9 +25,9 @@ interface AppSettingsContextType {
 
 const AppSettingsContext = createContext<AppSettingsContextType>({
   theme: 'dark',
-  setTheme: () => {},
+  setTheme: () => { },
   currency: 'DOP',
-  setCurrency: () => {},
+  setCurrency: () => { },
 });
 
 function useAppSettings() {
@@ -86,70 +86,70 @@ export default function App() {
 
   return (
     <AppSettingsContext.Provider value={{ theme, setTheme: handleSetTheme, currency, setCurrency: handleSetCurrency }}>
-    <div className="flex min-h-screen bg-bg-deep text-text-main font-sans selection:bg-primary/30">
-      {/* Sidebar */}
-      <aside className="w-[260px] bg-bg-sidebar text-text-main flex flex-col fixed h-full z-20 border-r border-border">
-        <div className="p-8">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-              <Calendar className="w-5 h-5 text-white" />
+      <div className="flex min-h-screen bg-bg-deep text-text-main font-sans selection:bg-primary/30">
+        {/* Sidebar */}
+        <aside className="w-[260px] bg-bg-sidebar text-text-main flex flex-col fixed h-full z-20 border-r border-border">
+          <div className="p-8">
+            <div className="flex items-center gap-3 mb-12">
+              <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-2xl font-black tracking-tighter text-white">
+                KIAV<span className="text-primary">Gestore</span>
+              </h2>
             </div>
-            <h2 className="text-2xl font-black tracking-tighter text-white">
-              KIAV<span className="text-primary">Gestore</span>
-            </h2>
+            <nav className="space-y-1.5">
+              <NavItem icon={<LayoutDashboard className="w-5 h-5" />} label="Dashboard" active={activeSection === 'dashboard'} onClick={() => setActiveSection('dashboard')} />
+              <NavItem icon={<Calendar className="w-5 h-5" />} label="Eventos" active={activeSection === 'events'} onClick={() => setActiveSection('events')} />
+              <NavItem icon={<Boxes className="w-5 h-5" />} label="Inventario" active={activeSection === 'inventory'} onClick={() => setActiveSection('inventory')} />
+              <NavItem icon={<Users className="w-5 h-5" />} label="Empleados" active={activeSection === 'employees'} onClick={() => setActiveSection('employees')} />
+              <NavItem icon={<UserCircle className="w-5 h-5" />} label="Clientes" active={activeSection === 'clients'} onClick={() => setActiveSection('clients')} />
+              <NavItem icon={<FileText className="w-5 h-5" />} label="Finanzas" active={activeSection === 'finances'} onClick={() => setActiveSection('finances')} />
+              <NavItem
+                icon={<Receipt className="w-5 h-5" />}
+                label="Egresos"
+                active={activeSection === 'expenses'}
+                onClick={() => setActiveSection('expenses')}
+              />
+              <NavItem
+                icon={<Settings className="w-5 h-5" />}
+                label="Configuración"
+                active={activeSection === 'configuration'}
+                onClick={() => setActiveSection('configuration' as Section)}
+              />
+            </nav>
           </div>
-          <nav className="space-y-1.5">
-            <NavItem icon={<LayoutDashboard className="w-5 h-5" />} label="Dashboard" active={activeSection === 'dashboard'} onClick={() => setActiveSection('dashboard')} />
-            <NavItem icon={<Calendar className="w-5 h-5" />} label="Eventos" active={activeSection === 'events'} onClick={() => setActiveSection('events')} />
-            <NavItem icon={<Boxes className="w-5 h-5" />} label="Inventario" active={activeSection === 'inventory'} onClick={() => setActiveSection('inventory')} />
-            <NavItem icon={<Users className="w-5 h-5" />} label="Empleados" active={activeSection === 'employees'} onClick={() => setActiveSection('employees')} />
-            <NavItem icon={<UserCircle className="w-5 h-5" />} label="Clientes" active={activeSection === 'clients'} onClick={() => setActiveSection('clients')} />
-            <NavItem icon={<FileText className="w-5 h-5" />} label="Finanzas" active={activeSection === 'finances'} onClick={() => setActiveSection('finances')} />
-            <NavItem
-              icon={<Receipt className="w-5 h-5" />}
-              label="Egresos"
-              active={activeSection === 'expenses'}
-              onClick={() => setActiveSection('expenses')}
-            />
-            <NavItem
-              icon={<Settings className="w-5 h-5" />}
-              label="Configuración"
-              active={activeSection === 'configuration'}
-              onClick={() => setActiveSection('configuration' as Section)}
-            />
-          </nav>
-        </div>
-        <div className="mt-auto p-6 border-t border-border bg-black/20">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xs">EL</div>
-            <div>
-              <p className="text-sm font-bold text-white leading-none">Esteban Lopez</p>
-              <p className="text-[10px] text-primary font-black uppercase tracking-widest mt-1">Admin #20</p>
+          <div className="mt-auto p-6 border-t border-border bg-black/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xs">EL</div>
+              <div>
+                <p className="text-sm font-bold text-white leading-none">Esteban Lopez</p>
+                <p className="text-[10px] text-primary font-black uppercase tracking-widest mt-1">Admin #20</p>
+              </div>
             </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      <main className="flex-1 ml-[260px] min-h-screen flex flex-col">
-        <header className="h-[80px] bg-bg-deep/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-10 sticky top-0 z-10">
-          <div className="text-[11px] font-black uppercase tracking-[0.2em] text-text-muted">
-            KIAV<span className="text-primary">Gestore</span> <span className="mx-2 text-border">/</span> <span className="text-white uppercase">{activeSection}</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="relative group">
+        <main className="flex-1 ml-[260px] min-h-screen flex flex-col">
+          <header className="h-[80px] bg-bg-deep/80 backdrop-blur-xl border-b border-border flex items-center justify-between px-10 sticky top-0 z-10">
+            <div className="text-[11px] font-black uppercase tracking-[0.2em] text-text-muted">
+              KIAV<span className="text-primary">Gestore</span> <span className="mx-2 text-border">/</span> <span className="text-white uppercase">{activeSection}</span>
             </div>
-          </div>
-        </header>
+            <div className="flex items-center gap-6">
+              <div className="relative group">
+              </div>
+            </div>
+          </header>
 
-        <div className="p-10">
-          <AnimatePresence mode="wait">
-            <motion.div key={activeSection} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3 }}>
-              {renderContent()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </main>
-    </div>
+          <div className="p-10">
+            <AnimatePresence mode="wait">
+              <motion.div key={activeSection} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -15 }} transition={{ duration: 0.3 }}>
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </main>
+      </div>
     </AppSettingsContext.Provider>
   );
 }
@@ -1071,7 +1071,7 @@ function EventsList() {
                     </h3>
 
                     <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary/80 mt-2">
-                      {event.event_type_name || event.event_type_label || eventTypes.find((type) => type.id === (event.event_type ?? event.event_type_id))?.name || 'Tipo no asignado'}
+                      {event.event_type || event.event_type_label || eventTypes.find((type) => type.id === (event.event_type ?? event.event_type_id))?.name || 'Tipo no asignado'}
                     </p>
 
                     <p className="text-[11px] text-text-muted mt-1 leading-relaxed line-clamp-2 max-w-xl">
@@ -4044,11 +4044,10 @@ function ConfigurationSection() {
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`w-full text-left p-4 rounded-3xl transition-all border ${
-                activeTab === tab.key
+              className={`w-full text-left p-4 rounded-3xl transition-all border ${activeTab === tab.key
                   ? 'border-primary bg-primary/10 text-white'
                   : 'border-border bg-bg-deep text-text-muted hover:border-primary hover:text-white'
-              }`}
+                }`}
             >
               <span className="text-[11px] font-black uppercase tracking-[0.2em]">
                 {tab.label}
@@ -4270,25 +4269,51 @@ function ConfigurationSection() {
               <div className="grid gap-4 md:grid-cols-2">
 
                 <button
-                  className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4"
-                  disabled
+                  type="button"
+                  onClick={async () => {
+
+                    try {
+
+                      await backupAPI.createFull();
+
+                      alert('Backup FULL creado correctamente.');
+
+                    } catch (error) {
+
+                      console.error(error);
+
+                      alert('No se pudo crear el backup FULL.');
+                    }
+
+                  }}
+                  className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4 hover:border-primary hover:text-white transition-all"
                 >
-                  Crear respaldo
+                  Crear respaldo FULL
                 </button>
 
                 <button
-                  className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4"
-                  disabled
+                  onClick={async () => {
+
+                    try {
+
+                      await backupAPI.createLog();
+
+                      alert('Backup LOG creado correctamente.');
+
+                    } catch (error) {
+
+                      console.error(error);
+
+                      alert('No se pudo crear el backup LOG.');
+                    }
+
+                  }}
+                  className="w-full bg-bg-deep border border-border text-text-muted rounded-2xl px-5 py-4 hover:border-primary hover:text-white transition-all"
                 >
-                  Restaurar respaldo
+                  Crear respaldo LOG
                 </button>
 
               </div>
-
-              <div className="p-6 border border-dashed border-border rounded-3xl text-text-muted">
-                La funcionalidad estará disponible en próximas versiones.
-              </div>
-
             </div>
           )}
 
@@ -4815,11 +4840,10 @@ function ExpensesSection({
 
                 <td className="px-8 py-6">
 
-                  <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${
-                    expense.expenses_status
+                  <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${expense.expenses_status
                       ? 'bg-green-500/10 text-green-400 border border-green-500/20'
                       : 'bg-red-500/10 text-red-400 border border-red-500/20'
-                  }`}>
+                    }`}>
                     {expense.expenses_status ? 'Pagado' : 'Pendiente'}
                   </span>
 
