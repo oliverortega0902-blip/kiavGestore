@@ -189,9 +189,20 @@ export const usersAPI = {
   delete: (id: number) => fetchAPI(`/users/${id}`, { method: 'DELETE' }),
 };
 
+export const userRolesAPI = {
+  getByUserId: (userId: number) => fetchAPI(`/userRoles/${userId}`),
+  getAll: () => fetchAPI('/userRoles'),
+};
+
+export const rolesAPI = {
+  getAll: () => fetchAPI('/roles'),
+  getById: (id: number) => fetchAPI(`/roles/${id}`),
+};
+
 export const authAPI = {
   login: (username: string, password: string) => fetchAPI('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   register: (username: string, password: string) => fetchAPI('/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  changePassword: (username: string, oldPassword: string, newPassword: string) => fetchAPI('/auth/change-password', { method: 'POST', body: JSON.stringify({ username, oldPassword, newPassword }) }),
 };
 
 export const eventEmployeesAPI = {

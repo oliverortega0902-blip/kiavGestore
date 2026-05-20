@@ -11,12 +11,17 @@ import Login from './page/Login/Login.jsx';
 import Register from './page/Register/Register';
 import {
   eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI,
-  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI, backupAPI
+  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI, backupAPI, authAPI, userRolesAPI, rolesAPI
 } from './api';
 
 // ─── TIPOS Y HELPERS GLOBALES ────────────────────────────────────────────────
 
 export type ThemeOption = 'dark' | 'beige-light' | 'blue-light' | 'beige-dark' | 'light-dark';
+
+interface User {
+  id: number;
+  username: string;
+}
 
 interface AppSettingsContextType {
   theme: ThemeOption;
@@ -46,7 +51,20 @@ function formatMoney(value: number | string | undefined | null, currency: 'DOP' 
 
 export default function App() {
   const [route, setRoute] = useState(() => window.location.pathname || '/');
-  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('kiav_auth')));
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('kiav_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [currentRole, setCurrentRole] = useState<string>('');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    const auth = Boolean(localStorage.getItem('kiav_auth'));
+    const user = Boolean(localStorage.getItem('kiav_user'));
+    return auth && user;
+  });
   const [activeSection, setActiveSection] = useState<Section>(() => window.location.pathname === '/dashboard' ? 'dashboard' : 'events');
   const [searchQuery, setSearchQuery] = useState('');
   const [financeMode, setFinanceMode] = useState<'insert' | 'list'>('insert');
@@ -87,14 +105,60 @@ export default function App() {
     }
   }, [route, isAuthenticated]);
 
-  const handleLoginSuccess = () => {
+  useEffect(() => {
+    const loadRole = async () => {
+      if (!currentUser) {
+        setCurrentRole('');
+        return;
+      }
+
+      try {
+        const data: any = await userRolesAPI.getByUserId(currentUser.id);
+        const assignment = Array.isArray(data) ? data[0] : data;
+        if (!assignment) {
+          setCurrentRole('Sin rol');
+          return;
+        }
+
+        const roleName = assignment.role_name || assignment.role || assignment.name || assignment.nombre;
+        if (roleName) {
+          setCurrentRole(roleName);
+          return;
+        }
+
+        const roleId = assignment.role_id || assignment.roleId || assignment.id;
+        if (!roleId) {
+          setCurrentRole('Sin rol');
+          return;
+        }
+
+        const roleData: any = await rolesAPI.getById(roleId);
+        const fetchedName = roleData?.name || roleData?.role_name || roleData?.nombre || roleData?.description;
+        setCurrentRole(fetchedName || `Rol #${roleId}`);
+      } catch {
+        setCurrentRole('Sin rol');
+      }
+    };
+
+    loadRole();
+  }, [currentUser]);
+
+  const handleLoginSuccess = (user: User) => {
     localStorage.setItem('kiav_auth', 'true');
+    localStorage.setItem('kiav_user', JSON.stringify(user));
+    setCurrentUser(user);
     setIsAuthenticated(true);
     setActiveSection('dashboard');
   };
 
   const handleLogout = () => {
+    if (!window.confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+      return;
+    }
     localStorage.removeItem('kiav_auth');
+    localStorage.removeItem('kiav_user');
+    setCurrentUser(null);
+    setCurrentRole('');
     setIsAuthenticated(false);
     setActiveSection('events');
     navigate('/login');
@@ -104,7 +168,7 @@ export default function App() {
     return <Register />;
   }
 
-  if (!isAuthenticated || route === '/login' || route === '/') {
+  if (!isAuthenticated || !currentUser || route === '/login' || route === '/') {
     return <Login onSuccess={handleLoginSuccess} />;
   }
 
@@ -130,7 +194,7 @@ export default function App() {
           />
         );
       case 'configuration':
-        return <ConfigurationSection />;
+        return <ConfigurationSection currentUser={currentUser} currentRole={currentRole} onLogout={handleLogout} />;
     }
   };
 
@@ -171,10 +235,12 @@ export default function App() {
           </div>
           <div className="mt-auto p-6 border-t border-border bg-black/20">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xs">EL</div>
+              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-xs">
+                {currentUser ? currentUser.username.charAt(0).toUpperCase() : 'U'}
+              </div>
               <div>
-                <p className="text-sm font-bold text-white leading-none">Esteban Lopez</p>
-                <p className="text-[10px] text-primary font-black uppercase tracking-widest mt-1">Admin #20</p>
+                <p className="text-sm font-bold text-white leading-none">{currentUser?.username || 'Usuario'}</p>
+                <p className="text-[10px] text-primary font-black uppercase tracking-widest mt-1">{currentRole || 'Sin rol'}</p>
               </div>
             </div>
           </div>
@@ -4013,15 +4079,33 @@ function FinancesSection({
 }
 // ─── CONFIGURACIÓN ─────────────────────────────────────────────────────────
 
-function ConfigurationSection() {
+function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentUser: User | null; currentRole: string; onLogout: () => void; }) {
   const { theme, setTheme, currency, setCurrency } = useAppSettings();
 
   const [activeTab, setActiveTab] = useState<
-    'tema' | 'empresa' | 'moneda' | 'metodos' | 'backup' | 'usuarios' | 'servidor'
+    'tema' | 'empresa' | 'moneda' | 'metodos' | 'backup' | 'miCuenta' | 'usuarios' | 'servidor'
   >('tema');
 
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(true);
+  const [accountData, setAccountData] = useState<User | null>(currentUser);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [accountMessage, setAccountMessage] = useState('');
+  const [accountError, setAccountError] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    usersAPI.getById(currentUser.id)
+      .then((data: any) => {
+        const userRecord = Array.isArray(data) ? data[0] : data;
+        setAccountData(userRecord || currentUser);
+      })
+      .catch(() => setAccountData(currentUser));
+  }, [currentUser]);
 
   useEffect(() => {
     paymentMethodsAPI.getAll()
@@ -4065,6 +4149,7 @@ function ConfigurationSection() {
     { key: 'moneda', label: 'Moneda' },
     { key: 'metodos', label: 'Métodos de pago' },
     { key: 'backup', label: 'Backup BD' },
+    { key: 'miCuenta', label: 'Mi cuenta' },
     { key: 'usuarios', label: 'Usuarios y permisos' },
     { key: 'servidor', label: 'Datos del servidor' },
   ] as const;
@@ -4382,11 +4467,162 @@ function ConfigurationSection() {
               </h3>
 
               <p className="text-text-muted">
-                Gestión de cuentas y roles del sistema.
+                Este módulo es para administradores. Aquí se gestionan cuentas y roles.
               </p>
 
               <div className="p-8 border border-dashed border-border rounded-3xl min-h-[220px] flex flex-col items-center justify-center text-text-muted">
-                Contenido pendiente. Todo lo relacionado con inicio de sesión se completará después.
+                {currentRole.toLowerCase().includes('admin') ? (
+                  'Acceso de administrador: aquí irían las herramientas de usuarios y permisos.'
+                ) : (
+                  'Solo el administrador puede ver y gestionar usuarios y permisos.'
+                )}
+              </div>
+
+            </div>
+          )}
+
+          {activeTab === 'miCuenta' && (
+            <div className="space-y-6">
+
+              <h3 className="text-2xl font-black text-white uppercase">
+                Mi cuenta
+              </h3>
+
+              <p className="text-text-muted">
+                Ver tus datos, cambiar contraseña y cerrar sesión.
+              </p>
+
+              <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+                <div className="space-y-6">
+                  <div className="p-6 border border-border rounded-3xl bg-bg-deep">
+                    <h4 className="text-sm font-black uppercase tracking-[0.2em] text-text-muted">
+                      Datos de la cuenta
+                    </h4>
+                    <div className="mt-6 space-y-4">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-text-muted">Usuario</p>
+                        <p className="text-sm font-black text-white">{accountData?.username || 'No disponible'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-text-muted">ID de usuario</p>
+                        <p className="text-sm font-black text-white">{accountData?.id ? `#${accountData.id}` : 'No disponible'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-text-muted">Estado</p>
+                        <p className="text-sm font-black text-white">{currentUser ? 'Conectado' : 'Desconectado'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.2em] text-text-muted">Rol</p>
+                        <p className="text-sm font-black text-white">{currentRole || 'Sin rol asignado'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6 border border-border rounded-3xl bg-bg-deep space-y-4">
+                    <h4 className="text-sm font-black uppercase tracking-[0.2em] text-text-muted">Acciones</h4>
+                    <button
+                      type="button"
+                      onClick={onLogout}
+                      className="w-full bg-red-500/10 border border-red-500/20 text-red-300 rounded-2xl px-5 py-4 font-black hover:bg-red-500/15 transition"
+                    >
+                      Cerrar sesión
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6 border border-border rounded-3xl bg-bg-deep space-y-5">
+                  <h4 className="text-sm font-black uppercase tracking-[0.2em] text-text-muted">
+                    Cambiar contraseña
+                  </h4>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Contraseña actual</label>
+                      <input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className="w-full bg-bg-sidebar border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                        placeholder="Ingresa tu contraseña actual"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Nueva contraseña</label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full bg-bg-sidebar border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                        placeholder="Nueva contraseña"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Confirmar contraseña</label>
+                      <input
+                        type="password"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        className="w-full bg-bg-sidebar border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                        placeholder="Repite la nueva contraseña"
+                      />
+                    </div>
+
+                    {accountError && (
+                      <div className="text-sm text-red-400 font-medium">{accountError}</div>
+                    )}
+
+                    {accountMessage && (
+                      <div className="text-sm text-emerald-400 font-medium">{accountMessage}</div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setAccountError('');
+                        setAccountMessage('');
+
+                        if (!currentUser) {
+                          setAccountError('No hay usuario autenticado.');
+                          return;
+                        }
+
+                        if (!currentPassword || !newPassword || !confirmNewPassword) {
+                          setAccountError('Completa todos los campos.');
+                          return;
+                        }
+
+                        if (newPassword !== confirmNewPassword) {
+                          setAccountError('Las nuevas contraseñas no coinciden.');
+                          return;
+                        }
+
+                        if (!window.confirm('¿Confirmas que deseas cambiar tu contraseña?')) {
+                          return;
+                        }
+
+                        setSavingPassword(true);
+
+                        try {
+                          await authAPI.changePassword(currentUser.username, currentPassword, newPassword);
+                          setAccountMessage('Contraseña cambiada correctamente.');
+                          setCurrentPassword('');
+                          setNewPassword('');
+                          setConfirmNewPassword('');
+                        } catch (error: any) {
+                          setAccountError(error?.message || 'No se pudo cambiar la contraseña.');
+                        } finally {
+                          setSavingPassword(false);
+                        }
+                      }}
+                      disabled={savingPassword}
+                      className="w-full bg-primary text-black rounded-2xl px-5 py-4 font-black hover:bg-primary/90 transition"
+                    >
+                      {savingPassword ? 'Guardando...' : 'Actualizar contraseña'}
+                    </button>
+                  </div>
+                </div>
               </div>
 
             </div>

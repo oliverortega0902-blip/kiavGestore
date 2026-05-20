@@ -41,7 +41,7 @@ export default function Register() {
         <div className="login-wrapper">
             <div className="login-card">
                 <div className="brand-header">
-                    <h1 className="logo-text">K-<span className="logo-accent">DAILY</span></h1>
+                    <h1 className="logo-text">KIAV<span className="logo-accent">Gestore</span></h1>
                 </div>
 
                 <div className="form-title">

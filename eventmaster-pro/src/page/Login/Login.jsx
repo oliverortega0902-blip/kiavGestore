@@ -21,9 +21,9 @@ const Login = ({ onSuccess }) => {
         setError('');
 
         try {
-            await authAPI.login(email, password);
+            const response = await authAPI.login(email, password);
             if (typeof onSuccess === 'function') {
-                onSuccess();
+                onSuccess(response.user || response);
             }
         } catch (err) {
             const message = err?.message || 'Credenciales inválidas';
@@ -42,7 +42,7 @@ const Login = ({ onSuccess }) => {
                     <div className="logo-box">
                         <i className="fa-regular fa-calendar-days"></i>
                     </div>
-                    <h1 className="logo-text">K-<span className="logo-accent">DAILY</span></h1>
+                    <h1 className="logo-text">KIAV<span className="logo-accent">Gestore</span></h1>
                 </div>
 
                 <div className="form-title">
