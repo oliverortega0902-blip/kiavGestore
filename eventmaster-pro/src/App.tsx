@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Section, EventService, EventType, EventStatus, InventoryItem, Employee, Client, Invoice, InventoryAlert } from './types';
+import Login from './page/Login/Login.jsx';
+import Register from './page/Register/Register';
 import {
   eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI,
   clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI, backupAPI
@@ -43,7 +45,9 @@ function formatMoney(value: number | string | undefined | null, currency: 'DOP' 
 }
 
 export default function App() {
-  const [activeSection, setActiveSection] = useState<Section>('events');
+  const [route, setRoute] = useState(() => window.location.pathname || '/');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('kiav_auth')));
+  const [activeSection, setActiveSection] = useState<Section>(() => window.location.pathname === '/dashboard' ? 'dashboard' : 'events');
   const [searchQuery, setSearchQuery] = useState('');
   const [financeMode, setFinanceMode] = useState<'insert' | 'list'>('insert');
   const [expensesMode, setExpensesMode] = useState<'insert' | 'list'>('list');
@@ -57,6 +61,52 @@ export default function App() {
   );
   const handleSetTheme = (t: ThemeOption) => { setThemeState(t); localStorage.setItem('kiav_theme', t); };
   const handleSetCurrency = (c: 'DOP' | 'USD') => { setCurrencyState(c); localStorage.setItem('kiav_currency', c); };
+
+  const navigate = (to: string) => {
+    if (window.location.pathname === to) return;
+    window.history.pushState({}, '', to);
+    setRoute(to);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  };
+
+  useEffect(() => {
+    const handlePopState = () => setRoute(window.location.pathname || '/');
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated && route !== '/login' && route !== '/register') {
+      navigate('/login');
+      return;
+    }
+
+    if (isAuthenticated && (route === '/' || route === '/login')) {
+      setActiveSection('dashboard');
+      navigate('/dashboard');
+    }
+  }, [route, isAuthenticated]);
+
+  const handleLoginSuccess = () => {
+    localStorage.setItem('kiav_auth', 'true');
+    setIsAuthenticated(true);
+    setActiveSection('dashboard');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('kiav_auth');
+    setIsAuthenticated(false);
+    setActiveSection('events');
+    navigate('/login');
+  };
+
+  if (route === '/register') {
+    return <Register />;
+  }
+
+  if (!isAuthenticated || route === '/login' || route === '/') {
+    return <Login onSuccess={handleLoginSuccess} />;
+  }
 
   const renderContent = () => {
     switch (activeSection) {
@@ -136,8 +186,13 @@ export default function App() {
               KIAV<span className="text-primary">Gestore</span> <span className="mx-2 text-border">/</span> <span className="text-white uppercase">{activeSection}</span>
             </div>
             <div className="flex items-center gap-6">
-              <div className="relative group">
-              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="px-4 py-2 rounded-2xl border border-border bg-bg-surface text-sm font-bold text-white hover:bg-white/5 transition"
+              >
+                Cerrar sesión
+              </button>
             </div>
           </header>
 

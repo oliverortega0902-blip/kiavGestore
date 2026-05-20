@@ -1,29 +1,36 @@
 import React, { useState } from 'react';
+import { authAPI } from '../../api';
 import './Login.css';
 
-const Login = () => {
+const Login = ({ onSuccess }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     // Redirección nativa de JavaScript para saltar la librería rota
     const navigate = (ruta) => { 
         window.history.pushState({}, '', ruta);
         window.dispatchEvent(new PopStateEvent('popstate'));
     };
-    const handleSubmit = (e) => {
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        
-        // Simulación de carga y validación
-        setTimeout(() => {
-            console.log(`Acceso concedido para: ${email}`);
+        setError('');
+
+        try {
+            await authAPI.login(email, password);
+            if (typeof onSuccess === 'function') {
+                onSuccess();
+            }
+        } catch (err) {
+            const message = err?.message || 'Credenciales inválidas';
+            setError(message);
+        } finally {
             setLoading(false);
-            
-            // Redirigir al dashboard de K-Daily
-            navigate('/dashboard');
-        }, 1500);
+        }
     };
 
     return (
@@ -79,12 +86,14 @@ const Login = () => {
                         </div>
                     </div>
 
-                    <button type="submit" className="login-btn" disabled={loading}>
+                        <button type="submit" className="login-btn" disabled={loading}>
                         {loading ? "VERIFICANDO..." : "INICIAR SESIÓN"}
                     </button>
-                    
+                    {error && (
+                        <div className="text-sm text-red-400 font-medium mt-3">{error}</div>
+                    )}
                     <div className="form-footer">
-                    <p>¿No tienes cuenta? <span className="signup-link" style={{cursor: 'pointer'}} onClick={() => navigate('/register')}>Regístrate</span></p>
+                        <p>¿No tienes cuenta? <span className="signup-link" style={{cursor: 'pointer'}} onClick={() => navigate('/register')}>Regístrate</span></p>
                     </div>
                 </form>
 

@@ -21,6 +21,7 @@ import paymentMethodsRoutes from "./routes/payment_methods.js";
 import rolesRoutes from "./routes/roles.js";
 import userRolesRoutes from "./routes/user_roles.js";
 import usersRoutes from "./routes/users.js";
+import authRoutes from "./routes/auth.js";
 import workstationsRoutes from "./routes/workstations.js";
 import backupRoutes from "./routes/backupruta.js";
 
@@ -59,6 +60,7 @@ app.use("/api/paymentMethods", paymentMethodsRoutes);
 app.use("/api/roles", rolesRoutes);
 app.use("/api/userRoles", userRolesRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/workstations", workstationsRoutes);
 console.log("IMPORT BACKUP:", backupRoutes);
 app.use("/api/backup", backupRoutes);

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { authAPI } from '../../api';
 import './Register.css';
 
 export default function Register() {
@@ -6,6 +7,7 @@ export default function Register() {
     const [password, setPassword] = useState<string>('');
     const [confirmPassword, setConfirmPassword] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string>('');
 
     // Tipamos explícitamente "ruta" como un string para que no se ponga rojo
     const navigate = (ruta: string) => { 
@@ -13,19 +15,26 @@ export default function Register() {
         window.dispatchEvent(new PopStateEvent('popstate'));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
+
         if (password !== confirmPassword) {
-            alert("¡Las contraseñas no coinciden!");
+            setError("¡Las contraseñas no coinciden!");
             return;
         }
         
         setLoading(true);
-        setTimeout(() => {
+
+        try {
+            await authAPI.register(email, password);
             alert("Usuario registrado con éxito");
+            navigate('/login'); // Regresa al Login
+        } catch (err) {
+            setError(err?.message || 'No se pudo registrar el usuario');
+        } finally {
             setLoading(false);
-            navigate('/'); // Regresa al Login
-        }, 1500);
+        }
     };
 
     return (
@@ -83,9 +92,11 @@ export default function Register() {
                     <button type="submit" className="login-btn" disabled={loading}>
                         {loading ? "REGISTRANDO..." : "REGISTRARSE"}
                     </button>
-                    
+                    {error && (
+                        <div className="text-sm text-red-400 font-medium mt-3">{error}</div>
+                    )}
                     <div className="form-footer">
-                        <p>¿Ya tienes cuenta? <span className="signup-link" style={{cursor: 'pointer'}} onClick={() => navigate('/')}>Inicia Sesión</span></p>
+                        <p>¿Ya tienes cuenta? <span className="signup-link" style={{cursor: 'pointer'}} onClick={() => navigate('/login')}>Inicia Sesión</span></p>
                     </div>
                 </form>
             </div>

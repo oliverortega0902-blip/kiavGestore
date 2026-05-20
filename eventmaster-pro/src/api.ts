@@ -189,6 +189,10 @@ export const usersAPI = {
   delete: (id: number) => fetchAPI(`/users/${id}`, { method: 'DELETE' }),
 };
 
+export const authAPI = {
+  login: (username: string, password: string) => fetchAPI('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  register: (username: string, password: string) => fetchAPI('/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) }),
+};
 
 export const eventEmployeesAPI = {
 
