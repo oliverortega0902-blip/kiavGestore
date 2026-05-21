@@ -39,9 +39,6 @@ const Login = ({ onSuccess }) => {
                 <i className="fa-solid fa-star sparkle st-top"></i>
                 
                 <div className="brand-header">
-                    <div className="logo-box">
-                        <i className="fa-regular fa-calendar-days"></i>
-                    </div>
                     <h1 className="logo-text">KIAV<span className="logo-accent">Gestore</span></h1>
                 </div>
 

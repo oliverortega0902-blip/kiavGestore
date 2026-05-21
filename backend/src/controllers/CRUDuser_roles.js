@@ -98,10 +98,14 @@ export const getRoleByUserId = async (req, res) => {
       .query(`
         SELECT
           ur.*,
-          r.name AS role_name
+          u.username AS username,
+          r.name AS role_name,
+          r.name AS name
         FROM user_roles ur
         INNER JOIN roles r
           ON ur.role_id = r.id
+        INNER JOIN users u
+          ON ur.users_id = u.id
         WHERE ur.users_id = @userId
       `);
 

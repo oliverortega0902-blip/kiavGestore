@@ -82,9 +82,21 @@ export default function App() {
   const [currency, setCurrencyState] = useState<'DOP' | 'USD'>(
     () => (localStorage.getItem('kiav_currency') as 'DOP' | 'USD') || 'DOP'
   );
-  const handleSetTheme = (t: ThemeOption) => { setThemeState(t); localStorage.setItem('kiav_theme', t); };
+  const handleSetTheme = (t: ThemeOption) => setThemeState(t);
   const handleSetCurrency = (c: 'DOP' | 'USD') => { setCurrencyState(c); localStorage.setItem('kiav_currency', c); };
   const [currentRoleId, setCurrentRoleId] = useState<number | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem('kiav_theme', theme);
+    document.body.classList.remove(
+      'theme-dark',
+      'theme-beige-light',
+      'theme-blue-light',
+      'theme-beige-dark',
+      'theme-light-dark'
+    );
+    document.body.classList.add(`theme-${theme}`);
+  }, [theme]);
 
   const navigate = (to: string) => {
     if (window.location.pathname === to) return;
@@ -93,6 +105,17 @@ export default function App() {
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
+  const hasRole = currentRoleId !== null;
+  const isAdmin = currentRoleId === 1;
+  const isSalesExecutive = currentRoleId === 2;
+  const isRestrictedInventoryUser = currentRoleId === 3;
+
+  const visibleSections: Section[] = !hasRole ? [] :
+    isAdmin ? ['dashboard', 'events', 'inventory', 'employees', 'clients', 'finances', 'expenses', 'configuration'] :
+      isSalesExecutive ? ['events', 'configuration'] :
+        isRestrictedInventoryUser ? ['inventory', 'expenses', 'configuration'] :
+          ['dashboard', 'events', 'inventory', 'employees', 'clients', 'finances', 'expenses', 'configuration'];
+
   useEffect(() => {
     const handlePopState = () => setRoute(window.location.pathname || '/');
     window.addEventListener('popstate', handlePopState);
@@ -100,14 +123,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (visibleSections.length > 0 && !visibleSections.includes(activeSection)) {
+      const nextSection = visibleSections[0];
+      setActiveSection(nextSection);
+      const sectionRouteMap: Record<Section, string> = {
+        dashboard: '/dashboard',
+        events: '/events',
+        inventory: '/inventory',
+        employees: '/employees',
+        clients: '/clients',
+        finances: '/finances',
+        expenses: '/expenses',
+        configuration: '/configuration',
+      };
+      navigate(sectionRouteMap[nextSection]);
+    }
+  }, [currentRoleId]);
+
+  useEffect(() => {
     if (!isAuthenticated && route !== '/login' && route !== '/register') {
       navigate('/login');
       return;
-    }
-
-    if (isAuthenticated && (route === '/' || route === '/login')) {
-      setActiveSection('dashboard');
-      navigate('/dashboard');
     }
   }, [route, isAuthenticated]);
 
@@ -240,6 +276,7 @@ export default function App() {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setActiveSection('dashboard');
+    navigate('/dashboard');
   };
 
   const handleLogout = () => {
@@ -264,9 +301,13 @@ export default function App() {
   }
 
   const renderContent = () => {
+    if (!hasRole) {
+      return null;
+    }
+
     switch (activeSection) {
       case 'dashboard': return <DashboardOverview setSection={(s) => setActiveSection(s as Section)} />;
-      case 'events': return <EventsList />;
+      case 'events': return <EventsList currentUser={currentUser} currentRoleId={currentRoleId} />;
       case 'inventory': return <InventoryList />;
       case 'employees': return <EmployeeList />;
       case 'clients': return <ClientList />;
@@ -285,7 +326,7 @@ export default function App() {
           />
         );
       case 'configuration':
-        return <ConfigurationSection currentUser={currentUser} currentRole={currentRole} onLogout={handleLogout} />;
+        return <ConfigurationSection currentUser={currentUser} currentRole={currentRole} currentRoleId={currentRoleId} onLogout={handleLogout} />;
     }
   };
 
@@ -304,24 +345,40 @@ export default function App() {
               </h2>
             </div>
             <nav className="space-y-1.5">
-              <NavItem icon={<LayoutDashboard className="w-5 h-5" />} label="Dashboard" active={activeSection === 'dashboard'} onClick={() => setActiveSection('dashboard')} />
-              <NavItem icon={<Calendar className="w-5 h-5" />} label="Eventos" active={activeSection === 'events'} onClick={() => setActiveSection('events')} />
-              <NavItem icon={<Boxes className="w-5 h-5" />} label="Inventario" active={activeSection === 'inventory'} onClick={() => setActiveSection('inventory')} />
-              <NavItem icon={<Users className="w-5 h-5" />} label="Empleados" active={activeSection === 'employees'} onClick={() => setActiveSection('employees')} />
-              <NavItem icon={<UserCircle className="w-5 h-5" />} label="Clientes" active={activeSection === 'clients'} onClick={() => setActiveSection('clients')} />
-              <NavItem icon={<FileText className="w-5 h-5" />} label="Finanzas" active={activeSection === 'finances'} onClick={() => setActiveSection('finances')} />
-              <NavItem
-                icon={<Receipt className="w-5 h-5" />}
-                label="Egresos"
-                active={activeSection === 'expenses'}
-                onClick={() => setActiveSection('expenses')}
-              />
-              <NavItem
-                icon={<Settings className="w-5 h-5" />}
-                label="Configuración"
-                active={activeSection === 'configuration'}
-                onClick={() => setActiveSection('configuration' as Section)}
-              />
+              {visibleSections.includes('dashboard') && (
+                <NavItem icon={<LayoutDashboard className="w-5 h-5" />} label="Dashboard" active={activeSection === 'dashboard'} onClick={() => setActiveSection('dashboard')} />
+              )}
+              {visibleSections.includes('events') && (
+                <NavItem icon={<Calendar className="w-5 h-5" />} label="Eventos" active={activeSection === 'events'} onClick={() => setActiveSection('events')} />
+              )}
+              {visibleSections.includes('inventory') && (
+                <NavItem icon={<Boxes className="w-5 h-5" />} label="Inventario" active={activeSection === 'inventory'} onClick={() => setActiveSection('inventory')} />
+              )}
+              {visibleSections.includes('employees') && (
+                <NavItem icon={<Users className="w-5 h-5" />} label="Empleados" active={activeSection === 'employees'} onClick={() => setActiveSection('employees')} />
+              )}
+              {visibleSections.includes('clients') && (
+                <NavItem icon={<UserCircle className="w-5 h-5" />} label="Clientes" active={activeSection === 'clients'} onClick={() => setActiveSection('clients')} />
+              )}
+              {visibleSections.includes('finances') && (
+                <NavItem icon={<FileText className="w-5 h-5" />} label="Finanzas" active={activeSection === 'finances'} onClick={() => setActiveSection('finances')} />
+              )}
+              {visibleSections.includes('expenses') && (
+                <NavItem
+                  icon={<Receipt className="w-5 h-5" />}
+                  label="Egresos"
+                  active={activeSection === 'expenses'}
+                  onClick={() => setActiveSection('expenses')}
+                />
+              )}
+              {visibleSections.includes('configuration') && (
+                <NavItem
+                  icon={<Settings className="w-5 h-5" />}
+                  label="Configuración"
+                  active={activeSection === 'configuration'}
+                  onClick={() => setActiveSection('configuration' as Section)}
+                />
+              )}
             </nav>
           </div>
           <div className="mt-auto p-6 border-t border-border bg-black/20">
@@ -498,6 +555,7 @@ function EventsList({
   currentRoleId: number | null;
 }) {
   const { theme, setTheme, currency, setCurrency } = useAppSettings();
+  const canCreateEvents = currentRoleId !== 2 && currentRoleId !== null;
   const [selectedClient, setSelectedClient] = useState<number | string | undefined>();
   const [selectedEventType, setSelectedEventType] = useState<number | string | undefined>();
   const [selectedEventStatus, setSelectedEventStatus] = useState<number | string | undefined>();
@@ -800,13 +858,15 @@ function EventsList({
           </p>
         </div>
 
-        <button
-          onClick={handleCreate}
-          className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-95 transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo Evento
-        </button>
+        {canCreateEvents && (
+          <button
+            onClick={handleCreate}
+            className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-95 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo Evento
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -4226,9 +4286,24 @@ function FinancesSection({
 }
 // ─── CONFIGURACIÓN ─────────────────────────────────────────────────────────
 
-function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentUser: User | null; currentRole: string; onLogout: () => void; }) {
+function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogout }: { currentUser: User | null; currentRole: string; currentRoleId: number | null; onLogout: () => void; }) {
   const { theme, setTheme, currency, setCurrency } = useAppSettings();
 
+  const tabs = [
+    { key: 'tema', label: 'Tema' },
+    { key: 'empresa', label: 'Empresa/Negocio' },
+    { key: 'moneda', label: 'Moneda' },
+    { key: 'metodos', label: 'Métodos de pago' },
+    { key: 'backup', label: 'Backup BD' },
+    { key: 'miCuenta', label: 'Mi cuenta' },
+    { key: 'usuarios', label: 'Usuarios y permisos' },
+    { key: 'servidor', label: 'Datos del servidor' },
+  ] as const;
+
+  const isAdmin = currentRoleId === 1;
+  const visibleConfigTabs = isAdmin
+    ? tabs
+    : tabs.filter((tab) => !['empresa', 'backup', 'servidor'].includes(tab.key));
 
   const [activeTab, setActiveTab] = useState<
     'tema' | 'empresa' | 'moneda' | 'metodos' | 'backup' | 'miCuenta' | 'usuarios' | 'servidor'
@@ -4370,9 +4445,8 @@ function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentU
 
         }
 
-        await loadData();
+        await loadData(selectedUser);
 
-        setSelectedUser(undefined);
         setSelectedRole(undefined);
 
       } catch (error) {
@@ -4407,7 +4481,7 @@ function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentU
           assignmentId
         );
 
-        await loadData();
+        await loadData(selectedUser);
 
       } catch (error) {
 
@@ -4571,13 +4645,13 @@ function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentU
 
                     <p className="text-sm font-black text-white">
                       {
-                        assignment.username
+                        assignment.username || assignment.user_name || assignment.users_username || `Usuario #${assignment.users_id}`
                       }
                     </p>
 
                     <p className="text-[11px] text-text-muted mt-1">
                       {
-                        assignment.name
+                        assignment.name || assignment.role_name || assignment.roleName || assignment.role || assignment.nombre || 'Rol desconocido'
                       }
                     </p>
 
@@ -4627,19 +4701,6 @@ function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentU
       .finally(() => setLoadingPayments(false));
   }, []);
 
-  // ─── APLICAR TEMA GLOBALMENTE ─────────────────────────────────────────────
-
-  useEffect(() => {
-    document.body.classList.remove(
-      'theme-dark',
-      'theme-beige-light',
-      'theme-blue-light',
-      'theme-beige-dark',
-      'theme-light-dark'
-    );
-
-    document.body.classList.add(`theme-${theme}`);
-  }, [theme]);
 
   // ─── DATOS SERVIDOR ───────────────────────────────────────────────────────
 
@@ -4654,18 +4715,11 @@ function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentU
     }
   })();
 
-  // ─── TABS ─────────────────────────────────────────────────────────────────
-
-  const tabs = [
-    { key: 'tema', label: 'Tema' },
-    { key: 'empresa', label: 'Empresa/Negocio' },
-    { key: 'moneda', label: 'Moneda' },
-    { key: 'metodos', label: 'Métodos de pago' },
-    { key: 'backup', label: 'Backup BD' },
-    { key: 'miCuenta', label: 'Mi cuenta' },
-    { key: 'usuarios', label: 'Usuarios y permisos' },
-    { key: 'servidor', label: 'Datos del servidor' },
-  ] as const;
+  useEffect(() => {
+    if (!visibleConfigTabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(visibleConfigTabs[0]?.key ?? 'tema');
+    }
+  }, [currentRoleId, activeTab]);
 
   return (
     <div className="space-y-8">
@@ -4692,7 +4746,7 @@ function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentU
 
         <aside className="bg-bg-surface border border-border rounded-3xl p-6 space-y-2">
 
-          {tabs.map((tab) => (
+          {visibleConfigTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
