@@ -16,6 +16,8 @@ import {
 
 // ─── TIPOS Y HELPERS GLOBALES ────────────────────────────────────────────────
 
+
+
 export type ThemeOption = 'dark' | 'beige-light' | 'blue-light' | 'beige-dark' | 'light-dark';
 
 interface User {
@@ -59,6 +61,8 @@ export default function App() {
       return null;
     }
   });
+
+
   const [currentRole, setCurrentRole] = useState<string>('');
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     const auth = Boolean(localStorage.getItem('kiav_auth'));
@@ -70,6 +74,7 @@ export default function App() {
   const [financeMode, setFinanceMode] = useState<'insert' | 'list'>('insert');
   const [expensesMode, setExpensesMode] = useState<'insert' | 'list'>('list');
 
+
   // ── Settings globales ──
   const [theme, setThemeState] = useState<ThemeOption>(
     () => (localStorage.getItem('kiav_theme') as ThemeOption) || 'dark'
@@ -79,6 +84,7 @@ export default function App() {
   );
   const handleSetTheme = (t: ThemeOption) => { setThemeState(t); localStorage.setItem('kiav_theme', t); };
   const handleSetCurrency = (c: 'DOP' | 'USD') => { setCurrencyState(c); localStorage.setItem('kiav_currency', c); };
+  const [currentRoleId, setCurrentRoleId] = useState<number | null>(null);
 
   const navigate = (to: string) => {
     if (window.location.pathname === to) return;
@@ -106,42 +112,127 @@ export default function App() {
   }, [route, isAuthenticated]);
 
   useEffect(() => {
+
     const loadRole = async () => {
+
+
       if (!currentUser) {
+
         setCurrentRole('');
+        setCurrentRoleId(null);
+
         return;
       }
 
       try {
-        const data: any = await userRolesAPI.getByUserId(currentUser.id);
-        const assignment = Array.isArray(data) ? data[0] : data;
+
+        const response: any =
+          await userRolesAPI.getByUserId(
+            currentUser.id
+          );
+
+        console.log('ROLE RESPONSE:', response);
+
+        // NORMALIZAR RESPUESTA
+        let assignment = null;
+
+        if (Array.isArray(response)) {
+
+          assignment = response[0];
+
+        } else if (Array.isArray(response?.recordset)) {
+
+          assignment = response.recordset[0];
+
+        } else if (Array.isArray(response?.result)) {
+
+          assignment = response.result[0];
+
+        } else {
+
+          assignment = response;
+
+        }
+
+        console.log('ASSIGNMENT:', assignment);
+
         if (!assignment) {
+
           setCurrentRole('Sin rol');
+          setCurrentRoleId(null);
+
           return;
         }
 
-        const roleName = assignment.role_name || assignment.role || assignment.name || assignment.nombre;
-        if (roleName) {
-          setCurrentRole(roleName);
+        const detectedRoleId =
+          assignment.role_id ??
+          assignment.roleId ??
+          assignment.role ??
+          assignment.rol ??
+          assignment.fk_role ??
+          null;
+
+        console.log(
+          'ROLE ID DETECTADO:',
+          detectedRoleId
+        );
+
+        setCurrentRoleId(detectedRoleId);
+
+        const detectedRoleName =
+          assignment.role_name ??
+          assignment.roleName ??
+          assignment.role ??
+          assignment.name ??
+          assignment.nombre ??
+          '';
+
+        if (detectedRoleName) {
+
+          setCurrentRole(detectedRoleName);
+
           return;
         }
 
-        const roleId = assignment.role_id || assignment.roleId || assignment.id;
-        if (!roleId) {
-          setCurrentRole('Sin rol');
+        // SI SOLO TENEMOS ID → BUSCAR NOMBRE
+        if (detectedRoleId) {
+
+          const roleData: any =
+            await rolesAPI.getById(
+              detectedRoleId
+            );
+
+          console.log('ROLE DATA:', roleData);
+
+          const fetchedName =
+            roleData?.name ??
+            roleData?.role_name ??
+            roleData?.nombre ??
+            `Rol #${detectedRoleId}`;
+
+          setCurrentRole(fetchedName);
+
           return;
         }
 
-        const roleData: any = await rolesAPI.getById(roleId);
-        const fetchedName = roleData?.name || roleData?.role_name || roleData?.nombre || roleData?.description;
-        setCurrentRole(fetchedName || `Rol #${roleId}`);
-      } catch {
         setCurrentRole('Sin rol');
+
+      } catch (error) {
+
+        console.error(error);
+
+        setCurrentRole('Sin rol');
+        setCurrentRoleId(null);
+
       }
+
     };
 
     loadRole();
+
   }, [currentUser]);
+
+
 
   const handleLoginSuccess = (user: User) => {
     localStorage.setItem('kiav_auth', 'true');
@@ -399,7 +490,14 @@ function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode, labe
 
 // ─── EVENTOS ──────────────────────────────────────────────────────────────── NO TOCAR NUNCA
 
-function EventsList() {
+function EventsList({
+  currentUser,
+  currentRoleId
+}: {
+  currentUser: User | null;
+  currentRoleId: number | null;
+}) {
+  const { theme, setTheme, currency, setCurrency } = useAppSettings();
   const [selectedClient, setSelectedClient] = useState<number | string | undefined>();
   const [selectedEventType, setSelectedEventType] = useState<number | string | undefined>();
   const [selectedEventStatus, setSelectedEventStatus] = useState<number | string | undefined>();
@@ -411,6 +509,8 @@ function EventsList() {
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventService | null>(null);
+  const [accountData, setAccountData] = useState<User | null>(currentUser);
+
 
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assigningEvent, setAssigningEvent] = useState<EventService | null>(null);
@@ -438,21 +538,68 @@ function EventsList() {
   const [inventoryLoading, setInventoryLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      eventsAPI.getAll(),
-      clientsAPI.getAll(),
-      eventTypesAPI.getAll(),
-      eventStatusAPI.getAll()
-    ])
-      .then(([eventsData, clientsData, eventTypesData, eventStatusesData]) => {
-        setEvents(eventsData);
-        setClients(clientsData);
-        setEventTypes(eventTypesData);
-        setEventStatuses(eventStatusesData);
-      })
-      .catch(() => setError('No se pudieron cargar los eventos o los tipos de eventos.'))
-      .finally(() => setLoading(false));
-  }, []);
+
+    if (currentRoleId === null) return;
+
+    if (!currentUser?.id) return;
+
+    const loadEvents = async () => {
+
+      try {
+
+        setLoading(true);
+        setError(null);
+
+        let eventsData: any[] = [];
+
+        if (Number(currentRoleId) === 1) {
+
+          eventsData =
+            await eventsAPI.getAll();
+
+        } else {
+
+          eventsData =
+            await eventsAPI.getEmployeeEvents(
+              currentUser.id
+            );
+
+        }
+
+        const [
+          clientsData,
+          eventTypesData,
+          eventStatusesData
+        ] = await Promise.all([
+          clientsAPI.getAll(),
+          eventTypesAPI.getAll(),
+          eventStatusAPI.getAll()
+        ]);
+
+        setEvents(eventsData || []);
+        setClients(clientsData || []);
+        setEventTypes(eventTypesData || []);
+        setEventStatuses(eventStatusesData || []);
+
+      } catch (error) {
+
+        console.error(error);
+
+        setError(
+          'No se pudieron cargar los eventos.'
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+
+    loadEvents();
+
+  }, [currentRoleId, currentUser?.id]);
 
   const handleEdit = (event: EventService) => {
     setEditingEvent(event);
@@ -4082,6 +4229,7 @@ function FinancesSection({
 function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentUser: User | null; currentRole: string; onLogout: () => void; }) {
   const { theme, setTheme, currency, setCurrency } = useAppSettings();
 
+
   const [activeTab, setActiveTab] = useState<
     'tema' | 'empresa' | 'moneda' | 'metodos' | 'backup' | 'miCuenta' | 'usuarios' | 'servidor'
   >('tema');
@@ -4095,6 +4243,371 @@ function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentU
   const [accountMessage, setAccountMessage] = useState('');
   const [accountError, setAccountError] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+
+  function UsersPermissionsSection({
+    currentRole
+  }: {
+    currentRole: string;
+  }) {
+
+    const [users, setUsers] = useState<any[]>([]);
+    const [roles, setRoles] = useState<any[]>([]);
+    const [assignments, setAssignments] =
+      useState<any[]>([]);
+
+    const [selectedUser, setSelectedUser] =
+      useState<number | undefined>();
+
+    const [selectedRole, setSelectedRole] =
+      useState<number | undefined>();
+
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    const isAdmin =
+      currentRole?.toLowerCase().includes('admin');
+
+    const loadData = async (
+      userId?: number
+    ) => {
+
+      try {
+
+        setLoading(true);
+
+        const [
+          usersData,
+          rolesData
+        ] = await Promise.all([
+          usersAPI.getAll(),
+          rolesAPI.getAll()
+        ]);
+
+        setUsers(usersData || []);
+        setRoles(rolesData || []);
+
+        // SI HAY USUARIO SELECCIONADO
+        if (userId) {
+
+          const assignmentsData =
+            await userRolesAPI.getByUserId(
+              userId
+            );
+
+          setAssignments(
+            assignmentsData || []
+          );
+
+        }
+
+        // SI NO HAY USUARIO
+        else {
+
+          setAssignments([]);
+
+        }
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          'No se pudieron cargar los datos.'
+        );
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+    useEffect(() => {
+
+      loadData(selectedUser);
+
+    }, [selectedUser]);
+    const assignRole = async () => {
+
+      if (!selectedUser || !selectedRole) {
+
+        alert(
+          'Selecciona usuario y rol.'
+        );
+
+        return;
+      }
+
+      setSaving(true);
+
+      try {
+
+        const existingAssignment =
+          assignments.find(
+            (a) =>
+              Number(a.users_id) ===
+              Number(selectedUser)
+          );
+
+        // UPDATE
+        if (existingAssignment) {
+
+          await userRolesAPI.update({
+            id: existingAssignment.id,
+            users_id: selectedUser,
+            role_id: selectedRole
+          });
+
+        }
+
+        // CREATE
+        else {
+
+          await userRolesAPI.create({
+            users_id: selectedUser,
+            role_id: selectedRole
+          });
+
+        }
+
+        await loadData();
+
+        setSelectedUser(undefined);
+        setSelectedRole(undefined);
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          'No se pudo guardar el rol.'
+        );
+
+      } finally {
+
+        setSaving(false);
+
+      }
+
+    };
+
+    const deleteAssignment = async (
+      assignmentId: number
+    ) => {
+
+      if (
+        !window.confirm(
+          'Eliminar rol?'
+        )
+      ) return;
+
+      try {
+
+        await userRolesAPI.delete(
+          assignmentId
+        );
+
+        await loadData();
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          'No se pudo eliminar.'
+        );
+
+      }
+
+    };
+
+    if (!isAdmin) {
+
+      return (
+        <div className="space-y-6">
+
+          <h3 className="text-2xl font-black text-white uppercase">
+            Usuarios y permisos
+          </h3>
+
+          <div className="p-8 border border-dashed border-border rounded-3xl min-h-[220px] flex items-center justify-center text-text-muted">
+            Solo administradores.
+          </div>
+
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-8">
+
+        <div>
+
+          <h3 className="text-2xl font-black text-white uppercase">
+            Usuarios y permisos
+          </h3>
+
+          <p className="text-text-muted mt-2">
+            Gestión de roles.
+          </p>
+
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+
+          {/* ASIGNAR */}
+
+          <div className="bg-bg-deep border border-border rounded-3xl p-6 space-y-5">
+
+            <h4 className="text-sm font-black uppercase tracking-[0.2em] text-text-muted">
+              Asignar rol
+            </h4>
+
+            <div className="space-y-4">
+
+              <select
+                value={selectedUser || ''}
+                onChange={(e) =>
+                  setSelectedUser(
+                    e.target.value
+                      ? Number(e.target.value)
+                      : undefined
+                  )
+                }
+                 className="w-full bg-bg-sidebar border border-border rounded-2xl px-4 py-3 text-sm text-white"
+              >
+                <option value="">
+                  Usuario
+                </option>
+
+                {users.map((user) => (
+
+                  <option
+                    key={user.id}
+                    value={user.id}
+                  >
+                    {user.username}
+                  </option>
+
+                ))}
+
+              </select>
+
+              <select
+                value={selectedRole || ''}
+                onChange={(e) =>
+                  setSelectedRole(
+                    Number(e.target.value)
+                  )
+                }
+                className="w-full bg-bg-sidebar border border-border rounded-2xl px-4 py-3 text-sm text-white"
+              >
+                <option value="">
+                  Rol
+                </option>
+
+                {roles.map((role) => (
+
+                  <option
+                    key={role.id}
+                    value={role.id}
+                  >
+                    {
+                      role.name ||
+                      role.role_name ||
+                      role.nombre
+                    }
+                  </option>
+
+                ))}
+
+              </select>
+
+              <button
+                type="button"
+                disabled={saving}
+                onClick={assignRole}
+                className="w-full bg-primary text-black rounded-2xl px-5 py-4 font-black hover:bg-primary/90 transition"
+              >
+                {saving
+                  ? 'Guardando...'
+                  : 'Guardar rol'}
+              </button>
+
+            </div>
+
+          </div>
+
+          {/* LISTADO */}
+
+          <div className="bg-bg-deep border border-border rounded-3xl p-6 space-y-4">
+
+            <h4 className="text-sm font-black uppercase tracking-[0.2em] text-text-muted">
+              Roles actuales
+            </h4>
+
+            {loading ? (
+
+              <div className="text-text-muted">
+                Cargando...
+              </div>
+
+            ) : assignments.length === 0 ? (
+
+              <div className="text-text-muted">
+                Sin roles.
+              </div>
+
+            ) : (
+
+              assignments.map((assignment) => (
+
+                <div
+                  key={assignment.id}
+                  className="border border-border rounded-2xl p-4 flex items-center justify-between bg-black/20"
+                >
+
+                  <div>
+
+                    <p className="text-sm font-black text-white">
+                      {
+                        assignment.username
+                      }
+                    </p>
+
+                    <p className="text-[11px] text-text-muted mt-1">
+                      {
+                        assignment.name
+                      }
+                    </p>
+
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      deleteAssignment(
+                        assignment.id
+                      )
+                    }
+                    className="px-4 py-2 rounded-xl border border-red-500/20 text-red-300 hover:bg-red-500/10 transition"
+                  >
+                    Eliminar
+                  </button>
+
+                </div>
+
+              ))
+
+            )}
+
+          </div>
+
+        </div>
+
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (!currentUser) return;
@@ -4185,8 +4698,8 @@ function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentU
               type="button"
               onClick={() => setActiveTab(tab.key)}
               className={`w-full text-left p-4 rounded-3xl transition-all border ${activeTab === tab.key
-                  ? 'border-primary bg-primary/10 text-white'
-                  : 'border-border bg-bg-deep text-text-muted hover:border-primary hover:text-white'
+                ? 'border-primary bg-primary/10 text-white'
+                : 'border-border bg-bg-deep text-text-muted hover:border-primary hover:text-white'
                 }`}
             >
               <span className="text-[11px] font-black uppercase tracking-[0.2em]">
@@ -4460,25 +4973,7 @@ function ConfigurationSection({ currentUser, currentRole, onLogout }: { currentU
           {/* ─── USUARIOS ───────────────────────────────────── */}
 
           {activeTab === 'usuarios' && (
-            <div className="space-y-6">
-
-              <h3 className="text-2xl font-black text-white uppercase">
-                Usuarios y permisos
-              </h3>
-
-              <p className="text-text-muted">
-                Este módulo es para administradores. Aquí se gestionan cuentas y roles.
-              </p>
-
-              <div className="p-8 border border-dashed border-border rounded-3xl min-h-[220px] flex flex-col items-center justify-center text-text-muted">
-                {currentRole.toLowerCase().includes('admin') ? (
-                  'Acceso de administrador: aquí irían las herramientas de usuarios y permisos.'
-                ) : (
-                  'Solo el administrador puede ver y gestionar usuarios y permisos.'
-                )}
-              </div>
-
-            </div>
+            <UsersPermissionsSection currentRole={currentRole} />
           )}
 
           {activeTab === 'miCuenta' && (
@@ -5132,8 +5627,8 @@ function ExpensesSection({
                 <td className="px-8 py-6">
 
                   <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${expense.expenses_status
-                      ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-                      : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                    : 'bg-red-500/10 text-red-400 border border-red-500/20'
                     }`}>
                     {expense.expenses_status ? 'Pagado' : 'Pendiente'}
                   </span>

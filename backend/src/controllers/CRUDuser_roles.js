@@ -84,3 +84,38 @@ export const getAllUserRoles = async (req, res) => {
     });
   }
 };
+
+export const getRoleByUserId = async (req, res) => {
+
+  try {
+
+    const { userId } = req.params;
+
+    const pool = getPool();
+
+    const result = await pool.request()
+      .input("userId", sql.Int, userId)
+      .query(`
+        SELECT
+          ur.*,
+          r.name AS role_name
+        FROM user_roles ur
+        INNER JOIN roles r
+          ON ur.role_id = r.id
+        WHERE ur.users_id = @userId
+      `);
+
+    res.json(result.recordset);
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "Error obteniendo rol del usuario ❌",
+      error: error.message
+    });
+
+  }
+
+};

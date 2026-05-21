@@ -130,3 +130,27 @@ export const getAllEventServices = async (req, res) => {
   }
 };
 
+// GET EVENTS BY EMPLOYEE USER
+export const getEmployeeEvents = async (req, res) => {
+  try {
+
+    const { userId } = req.params;
+
+    const pool = getPool();
+
+    const result = await pool.request()
+      .input("UserId", sql.Int, userId)
+      .execute("sp_GetEmployeeEvents");
+
+    res.json(result.recordset);
+
+  } catch (error) {
+
+    console.error("Error:", error.message || error);
+
+    res.status(500).json({
+      message: "Error al obtener eventos del empleado ❌",
+      error: error.message
+    });
+  }
+};

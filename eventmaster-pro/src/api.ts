@@ -90,7 +90,7 @@ export const eventsAPI = {
   create: (data: any) => fetchAPI('/eventServices', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: any) => fetchAPI(`/eventServices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => fetchAPI(`/eventServices/${id}`, { method: 'DELETE' }),
-};
+  getEmployeeEvents: (userId: number) => fetchAPI(`/eventServices/employee/${userId}`),};
 
 // ============ TIPOS DE EVENTOS API ============
 export const eventTypesAPI = {
@@ -190,8 +190,30 @@ export const usersAPI = {
 };
 
 export const userRolesAPI = {
-  getByUserId: (userId: number) => fetchAPI(`/userRoles/${userId}`),
-  getAll: () => fetchAPI('/userRoles'),
+
+  getByUserId: (userId: number) =>
+    fetchAPI(`/userRoles/user/${userId}`),
+
+  getAll: () =>
+    fetchAPI('/userRoles'),
+
+  create: (data: any) =>
+    fetchAPI('/userRoles/asign', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  update: (data: any) =>
+    fetchAPI('/userRoles/change', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  delete: (id: number) =>
+    fetchAPI(`/userRoles/${id}`, {
+      method: 'DELETE',
+    }),
+
 };
 
 export const rolesAPI = {
