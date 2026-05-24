@@ -2043,11 +2043,10 @@ function InventoryList() {
               </div>
 
               <span
-                className={`text-[10px] font-black px-3 py-1 rounded-full border ${
-                  item.stock_actual <= item.stock_alert
+                className={`text-[10px] font-black px-3 py-1 rounded-full border ${item.stock_actual <= item.stock_alert
                     ? 'text-warning bg-warning/10 border-warning/20'
                     : 'text-success bg-success/10 border-success/20'
-                }`}
+                  }`}
               >
                 STOCK: {item.stock_actual}
               </span>
@@ -2193,19 +2192,22 @@ function EmployeeList() {
 
   const handleEdit = (emp: Employee) => {
     setEditingEmployee(emp);
+
     setFullname(emp.fullname || '');
     setNationalId(emp.national_id || '');
     setEmail(emp.email || '');
     setPhone(emp.phone || '');
 
+    // IMPORTANTE:
+    // usar workstation_id y no workstation
     setSelectedWorkstation(
-      emp.workstation
-        ? Number(emp.workstation)
+      emp.workstation_id != null
+        ? Number(emp.workstation_id)
         : undefined
     );
 
     setSelectedUser(
-      emp.assigned_user
+      emp.assigned_user != null
         ? Number(emp.assigned_user)
         : undefined
     );
@@ -2252,6 +2254,7 @@ function EmployeeList() {
   const handleSubmit = async (
     e: React.FormEvent<HTMLFormElement>
   ) => {
+
     e.preventDefault();
 
     const payload = {
@@ -2259,15 +2262,22 @@ function EmployeeList() {
       national_id: nationalId,
       email,
       phone,
-
       workstation: selectedWorkstation,
-
       assigned_user: selectedUser,
-
       employment_date: employmentDate
     };
 
     try {
+
+      const workstationData =
+        workstations.find(
+          (w) => w.id === selectedWorkstation
+        );
+
+      const userData =
+        users.find(
+          (u) => u.id === selectedUser
+        );
 
       if (editingEmployee) {
 
@@ -2281,7 +2291,18 @@ function EmployeeList() {
             emp.id === editingEmployee.id
               ? {
                 ...emp,
-                ...payload
+                ...payload,
+
+                workstation_id: selectedWorkstation,
+
+                workstation:
+                  workstationData?.title || '',
+
+                assigned_user:
+                  userData?.username || '',
+
+                assigned_user_id:
+                  selectedUser
               }
               : emp
           )
@@ -2292,9 +2313,26 @@ function EmployeeList() {
         const created =
           await employeesAPI.create(payload);
 
+        const newEmployee = {
+          ...created,
+          ...payload,
+
+          workstation_id:
+            selectedWorkstation,
+
+          workstation:
+            workstationData?.title || '',
+
+          assigned_user:
+            userData?.username || '',
+
+          assigned_user_id:
+            selectedUser
+        };
+
         setEmployees((prev) => [
           ...prev,
-          created
+          newEmployee
         ]);
       }
 
@@ -2303,6 +2341,7 @@ function EmployeeList() {
       resetForm();
 
     } catch (err) {
+
       console.error(err);
 
       alert('No se pudo guardar el empleado.');
@@ -2466,21 +2505,16 @@ function EmployeeList() {
 
                     <Combobox
                       options={workstations.map((w) => ({
-                        id: w.id,
+                        id: String(w.id),
                         label: w.title,
                         sublabel: `ID: ${w.id}`
                       }))}
 
-                      value={
-                        selectedWorkstation?.toString()
-                      }
+                      value={selectedWorkstation?.toString()}
 
                       onChange={(val) => {
-                        setSelectedWorkstation(
-                          Number(val)
-                        );
+                        setSelectedWorkstation(Number(val));
                       }}
-
                       placeholder="Seleccionar Puesto"
                     />
                   </div>
@@ -2808,13 +2842,17 @@ function ClientList() {
 
     try {
 
+      const selectedType =
+        clientTypes.find(
+          (t) => t.id === selectedKind
+        );
+
       if (editingClient) {
 
-        await clientsAPI.update(editingClient.id, payload);
-        const typeName =
-          clientTypes.find(
-            (t) => t.id === selectedKind
-          )?.name || selectedKind;
+        await clientsAPI.update(
+          editingClient.id,
+          payload
+        );
 
         setClients((prev) =>
           prev.map((client) =>
@@ -2822,7 +2860,9 @@ function ClientList() {
               ? {
                 ...client,
                 ...payload,
-                kind_name: typeName
+
+                kind_name:
+                  selectedType?.name || ''
               }
               : client
           )
@@ -2833,17 +2873,17 @@ function ClientList() {
         const created =
           await clientsAPI.create(payload);
 
-        const typeName =
-          clientTypes.find(
-            (t) => t.id === selectedKind
-          )?.name || selectedKind;
+        const newClient = {
+          ...created,
+          ...payload,
+
+          kind_name:
+            selectedType?.name || ''
+        };
 
         setClients((prev) => [
           ...prev,
-          {
-            ...created,
-            kind_name: typeName
-          }
+          newClient
         ]);
       }
 
