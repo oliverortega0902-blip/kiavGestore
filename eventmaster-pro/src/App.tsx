@@ -10,9 +10,9 @@ import { Section, EventService, EventType, EventStatus, InventoryItem, Employee,
 import Login from './page/Login/Login.jsx';
 import Register from './page/Register/Register';
 import {
-  eventsAPI, eventTypesAPI, eventStatusAPI, elementStatusAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, workstationsAPI,
-  clientTypesAPI, paymentMethodsAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI, backupAPI, authAPI, userRolesAPI, rolesAPI
+  eventsAPI, inventoryAPI, employeesAPI, clientsAPI, invoicesAPI, usersAPI, eventEmployeesAPI, eventItemsAPI, expensesAPI, backupAPI, authAPI, userRolesAPI, rolesAPI
 } from './api';
+import { clientTypesAPI, departmentsAPI, elementStatusAPI, eventStatusAPI, eventTypesAPI, paymentMethodsAPI, workstationsAPI, suppliersAPI } from './comboapi';
 
 // ─── TIPOS Y HELPERS GLOBALES ────────────────────────────────────────────────
 
@@ -1500,14 +1500,16 @@ function EventsList({
 
 
 // ─── INVENTARIO ───────────────────────────────────────────────────────────── NO TOOCAR NUNCAAAAAA!!!!!
-
 function InventoryList() {
   const { currency } = useAppSettings();
+
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [elementStatuses, setElementStatuses] = useState<EventStatus[]>([]);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
 
   const [selectedElementStatus, setSelectedElementStatus] = useState<number | undefined>();
   const [selectedCondition, setSelectedCondition] = useState<number | undefined>();
+  const [selectedSupplier, setSelectedSupplier] = useState<number | undefined>();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1521,26 +1523,16 @@ function InventoryList() {
   const [stockActual, setStockActual] = useState('');
   const [stockAlert, setStockAlert] = useState('');
 
-  const [showInventoryModal, setShowInventoryModal] = useState(false);
-  const [inventoryEvent, setInventoryEvent] = useState<EventService | null>(null);
-
-  const [allInventory, setAllInventory] = useState<any[]>([]);
-  const [assignedInventory, setAssignedInventory] = useState<any[]>([]);
-
-  const [selectedInventoryToAdd, setSelectedInventoryToAdd] = useState<number | undefined>(undefined);
-
-  const [inventoryQuantity, setInventoryQuantity] = useState('1');
-
-  const [inventoryLoading, setInventoryLoading] = useState(false);
-
   useEffect(() => {
     Promise.all([
       inventoryAPI.getAll(),
-      elementStatusAPI.getAll()
+      elementStatusAPI.getAll(),
+      suppliersAPI.getAll()
     ])
-      .then(([inventoryData, statusData]) => {
+      .then(([inventoryData, statusData, suppliersData]) => {
         setInventory(inventoryData);
         setElementStatuses(statusData);
+        setSuppliers(suppliersData);
       })
       .catch(() => {
         setError('No se pudo cargar el inventario o los estados.');
@@ -1556,6 +1548,7 @@ function InventoryList() {
 
     setSelectedElementStatus(undefined);
     setSelectedCondition(undefined);
+    setSelectedSupplier(undefined);
   };
 
   const handleCreate = () => {
@@ -1593,6 +1586,12 @@ function InventoryList() {
       item.state
         ? Number(item.state)
         : 1
+    );
+
+    setSelectedSupplier(
+      item.supplier_id
+        ? Number(item.supplier_id)
+        : undefined
     );
 
     setShowModal(true);
@@ -1653,12 +1652,14 @@ function InventoryList() {
       stock_alert:
         Number(stockAlert) || 0,
 
-      // FK RELACIONAL
       element_type:
         selectedElementStatus,
 
       state:
         selectedCondition || 1,
+
+      supplier_id:
+        selectedSupplier || null,
 
       act_date:
         new Date().toISOString()
@@ -1673,6 +1674,12 @@ function InventoryList() {
           payload
         );
 
+        const refreshedInventory =
+          await inventoryAPI.getAll();
+
+        setInventory(
+          refreshedInventory
+        );
 
       } else {
 
@@ -1713,65 +1720,6 @@ function InventoryList() {
         'No se pudo guardar el recurso.'
       );
     }
-  };
-
-  const addInventoryToEvent = async () => {
-    if (!inventoryEvent || !selectedInventoryToAdd) return;
-
-    setInventoryLoading(true);
-
-    try {
-      await eventItemsAPI.create({
-        event: inventoryEvent.id,
-        inventory: selectedInventoryToAdd,
-        quantity: Number(inventoryQuantity) || 1,
-      });
-
-      const refreshed = await eventItemsAPI.getByEvent(inventoryEvent.id);
-
-      setAssignedInventory(refreshed || []);
-
-      setSelectedInventoryToAdd(undefined);
-      setInventoryQuantity('1');
-    } catch (err) {
-      console.error(err);
-      alert('No se pudo añadir el inventario.');
-    } finally {
-      setInventoryLoading(false);
-    }
-  };
-
-
-  const deleteAssignedInventory = async (recordId: number) => {
-    if (!window.confirm('¿Eliminar este inventario del evento?')) return;
-
-    setInventoryLoading(true);
-
-    try {
-      await eventItemsAPI.delete(recordId);
-
-      const refreshed = await eventItemsAPI.getByEvent(inventoryEvent!.id);
-
-      setAssignedInventory(refreshed || []);
-    } catch (err) {
-      console.error(err);
-      alert('No se pudo eliminar el inventario.');
-    } finally {
-      setInventoryLoading(false);
-    }
-  };
-
-  const closeInventoryModal = () => {
-    setShowInventoryModal(false);
-
-    setInventoryEvent(null);
-
-    setAllInventory([]);
-    setAssignedInventory([]);
-
-    setSelectedInventoryToAdd(undefined);
-
-    setInventoryQuantity('1');
   };
 
   const getInventoryStatusLabel = (
@@ -2031,6 +1979,35 @@ function InventoryList() {
                     />
                   </div>
 
+                  <div className="space-y-2">
+
+                    <label className="text-[10px] font-black uppercase tracking-widest text-text-muted ml-1">
+                      Proveedor
+                    </label>
+
+                    <Combobox
+                      options={suppliers.map((supplier) => ({
+                        id: supplier.id,
+                        label: supplier.provider,
+                        sublabel:
+                          supplier.descript ||
+                          `ID: ${supplier.id}`
+                      }))}
+
+                      value={
+                        selectedSupplier?.toString()
+                      }
+
+                      onChange={(val) =>
+                        setSelectedSupplier(
+                          Number(val)
+                        )
+                      }
+
+                      placeholder="Seleccionar proveedor"
+                    />
+                  </div>
+
                 </div>
 
                 <div className="pt-6">
@@ -2066,11 +2043,11 @@ function InventoryList() {
               </div>
 
               <span
-                className={`text-[10px] font-black px-3 py-1 rounded-full border ${item.stock_actual <=
-                  item.stock_alert
-                  ? 'text-warning bg-warning/10 border-warning/20'
-                  : 'text-success bg-success/10 border-success/20'
-                  }`}
+                className={`text-[10px] font-black px-3 py-1 rounded-full border ${
+                  item.stock_actual <= item.stock_alert
+                    ? 'text-warning bg-warning/10 border-warning/20'
+                    : 'text-success bg-success/10 border-success/20'
+                }`}
               >
                 STOCK: {item.stock_actual}
               </span>
@@ -2084,8 +2061,12 @@ function InventoryList() {
               {getInventoryStatusLabel(item)}
             </p>
 
-            <p className="text-xs text-text-muted mb-5">
+            <p className="text-xs text-text-muted mb-1">
               Precio actual: {formatMoney(item.actual_price, currency)}
+            </p>
+
+            <p className="text-[10px] uppercase tracking-[0.2em] font-black text-primary mb-5">
+              {item.supplier_name || 'Sin proveedor'}
             </p>
 
             <div className="grid grid-cols-2 gap-3 pt-5 border-t border-border/40">
@@ -2136,297 +2117,11 @@ function InventoryList() {
 
             </div>
           </motion.div>
-        )
-
-        )}
-
-        {showInventoryModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={closeInventoryModal}
-            />
-
-            <div className="relative bg-bg-surface border border-border w-full max-w-4xl rounded-[24px] shadow-2xl p-6 overflow-y-auto max-h-[85vh] z-10">
-
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-text-muted mb-1">
-                    Evento
-                  </p>
-
-                  <input
-                    type="text"
-                    readOnly
-                    value={inventoryEvent?.title || ''}
-                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
-                  />
-                </div>
-
-                <button
-                  onClick={closeInventoryModal}
-                  className="p-2 rounded-full bg-bg-deep hover:bg-white/10 text-text-muted transition-all"
-                >
-                  <Plus className="w-5 h-5 rotate-45" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-[1.3fr_120px_120px] gap-4 mb-6">
-
-                <div>
-                  <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
-                    Inventario
-                  </label>
-
-                  <Combobox
-                    options={allInventory.map((item) => ({
-                      id: item.id,
-                      label: item.element || `Item #${item.id}`,
-                    }))}
-                    value={selectedInventoryToAdd}
-                    onChange={(val) => setSelectedInventoryToAdd(Number(val))}
-                    placeholder="Seleccionar inventario"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
-                    Cantidad
-                  </label>
-
-                  <input
-                    type="number"
-                    min="1"
-                    value={inventoryQuantity}
-                    onChange={(e) => setInventoryQuantity(e.target.value)}
-                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
-                  />
-                </div>
-
-                <div className="flex items-end">
-                  <button
-                    className="w-full px-4 py-3 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px]"
-                    onClick={addInventoryToEvent}
-                    disabled={inventoryLoading || !selectedInventoryToAdd}
-                  >
-                    Añadir
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-black uppercase tracking-widest text-text-muted mb-3">
-                  Inventario asignado
-                </h4>
-
-                <div className="overflow-x-auto rounded-3xl border border-border">
-                  <table className="min-w-full text-left">
-
-                    <thead>
-                      <tr className="bg-bg-deep/50 text-[10px] uppercase tracking-[0.24em] text-text-muted">
-                        <th className="px-4 py-3">ID</th>
-                        <th className="px-4 py-3">Elemento</th>
-                        <th className="px-4 py-3">Cantidad</th>
-                        <th className="px-4 py-3">Acción</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-
-                      {assignedInventory.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className="px-4 py-6 text-sm text-text-muted"
-                          >
-                            No hay inventario asignado a este evento.
-                          </td>
-                        </tr>
-                      ) : (
-                        assignedInventory.map((record: any) => (
-                          <tr
-                            key={record.id}
-                            className="border-t border-border text-sm text-white"
-                          >
-                            <td className="px-4 py-4">
-                              {record.inventory}
-                            </td>
-
-                            <td className="px-4 py-4">
-                              {record.element}
-                            </td>
-
-                            <td className="px-4 py-4">
-                              {record.quantity}
-                            </td>
-
-                            <td className="px-4 py-4">
-                              <button
-                                onClick={() => deleteAssignedInventory(record.id)}
-                                className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-
-                    </tbody>
-
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {showInventoryModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-              onClick={closeInventoryModal}
-            />
-
-            <div className="relative bg-bg-surface border border-border w-full max-w-4xl rounded-[24px] shadow-2xl p-6 overflow-y-auto max-h-[85vh] z-10">
-
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-xs font-black uppercase tracking-widest text-text-muted mb-1">
-                    Evento
-                  </p>
-
-                  <input
-                    type="text"
-                    readOnly
-                    value={inventoryEvent?.title || ''}
-                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
-                  />
-                </div>
-
-                <button
-                  onClick={closeInventoryModal}
-                  className="p-2 rounded-full bg-bg-deep hover:bg-white/10 text-text-muted transition-all"
-                >
-                  <Plus className="w-5 h-5 rotate-45" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-[1.3fr_120px_120px] gap-4 mb-6">
-
-                <div>
-                  <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
-                    Inventario
-                  </label>
-
-                  <Combobox
-                    options={allInventory.map((item) => ({
-                      id: item.id,
-                      label: item.element || `Item #${item.id}`,
-                    }))}
-                    value={selectedInventoryToAdd}
-                    onChange={(val) => setSelectedInventoryToAdd(Number(val))}
-                    placeholder="Seleccionar inventario"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-black uppercase tracking-widest text-text-muted mb-2 block">
-                    Cantidad
-                  </label>
-
-                  <input
-                    type="number"
-                    min="1"
-                    value={inventoryQuantity}
-                    onChange={(e) => setInventoryQuantity(e.target.value)}
-                    className="w-full bg-bg-deep border border-border rounded-2xl px-4 py-3 text-sm text-white"
-                  />
-                </div>
-
-                <div className="flex items-end">
-                  <button
-                    className="w-full px-4 py-3 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px]"
-                    onClick={addInventoryToEvent}
-                    disabled={inventoryLoading || !selectedInventoryToAdd}
-                  >
-                    Añadir
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-black uppercase tracking-widest text-text-muted mb-3">
-                  Inventario asignado
-                </h4>
-
-                <div className="overflow-x-auto rounded-3xl border border-border">
-                  <table className="min-w-full text-left">
-
-                    <thead>
-                      <tr className="bg-bg-deep/50 text-[10px] uppercase tracking-[0.24em] text-text-muted">
-                        <th className="px-4 py-3">ID</th>
-                        <th className="px-4 py-3">Elemento</th>
-                        <th className="px-4 py-3">Cantidad</th>
-                        <th className="px-4 py-3">Acción</th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-
-                      {assignedInventory.length === 0 ? (
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className="px-4 py-6 text-sm text-text-muted"
-                          >
-                            No hay inventario asignado a este evento.
-                          </td>
-                        </tr>
-                      ) : (
-                        assignedInventory.map((record: any) => (
-                          <tr
-                            key={record.id}
-                            className="border-t border-border text-sm text-white"
-                          >
-                            <td className="px-4 py-4">
-                              {record.inventory}
-                            </td>
-
-                            <td className="px-4 py-4">
-                              {record.element}
-                            </td>
-
-                            <td className="px-4 py-4">
-                              {record.quantity}
-                            </td>
-
-                            <td className="px-4 py-4">
-                              <button
-                                onClick={() => deleteAssignedInventory(record.id)}
-                                className="p-2 bg-red-500/5 border border-red-500/20 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-
-                    </tbody>
-
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        ))}
       </div>
     </div>
-
   );
 }
-
 // ─── EMPLEADOS ────────────────────────────────────────────────────────────── NO TOOCAR NUNCAAAAAA!!!!!
 function EmployeeList() {
   const [employees, setEmployees] = useState<any[]>([]);
@@ -4293,11 +3988,11 @@ function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogou
     { key: 'tema', label: 'Tema' },
     { key: 'empresa', label: 'Empresa/Negocio' },
     { key: 'moneda', label: 'Moneda' },
-    { key: 'metodos', label: 'Métodos de pago' },
     { key: 'backup', label: 'Backup BD' },
     { key: 'miCuenta', label: 'Mi cuenta' },
     { key: 'usuarios', label: 'Usuarios y permisos' },
     { key: 'servidor', label: 'Datos del servidor' },
+    { key: 'variantes', label: 'Variantes' },
   ] as const;
 
   const isAdmin = currentRoleId === 1;
@@ -4306,7 +4001,7 @@ function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogou
     : tabs.filter((tab) => !['empresa', 'backup', 'servidor'].includes(tab.key));
 
   const [activeTab, setActiveTab] = useState<
-    'tema' | 'empresa' | 'moneda' | 'metodos' | 'backup' | 'miCuenta' | 'usuarios' | 'servidor'
+    'tema' | 'empresa' | 'moneda' | 'backup' | 'miCuenta' | 'usuarios' | 'servidor' | 'variantes'
   >('tema');
 
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -4318,6 +4013,165 @@ function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogou
   const [accountMessage, setAccountMessage] = useState('');
   const [accountError, setAccountError] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
+  // ─── VARIANTES ───────────────────────────────────────────────
+
+  const [variantSection, setVariantSection] = useState<
+    | 'clientTypes'
+    | 'suppliers'
+    | 'departments'
+    | 'elementStatus'
+    | 'eventStatus'
+    | 'eventTypes'
+    | 'paymentMethods'
+    | 'workstations'
+  >('clientTypes');
+
+  const [variantMode, setVariantMode] = useState<
+    'insert' | 'list'
+  >('list');
+
+  const [variantsData, setVariantsData] =
+    useState<any[]>([]);
+
+  const [variantLoading, setVariantLoading] =
+    useState(false);
+
+  const [editingVariantId, setEditingVariantId] =
+    useState<number | null>(null);
+
+  const [variantName, setVariantName] =
+    useState('');
+
+  const [variantDescription, setVariantDescription] =
+    useState('');
+
+  const [variantDepartment, setVariantDepartment] =
+    useState<number | undefined>();
+
+  const [variantDepartments, setVariantDepartments] =
+    useState<any[]>([]);
+
+  const variantTabs = [
+    {
+      key: 'clientTypes',
+      label: 'Tipos de Cliente'
+    },
+    {
+      key: 'suppliers',
+      label: 'Proveedores'
+    },
+    {
+      key: 'departments',
+      label: 'Departamentos'
+    },
+    {
+      key: 'elementStatus',
+      label: 'Estados de Elementos'
+    },
+    {
+      key: 'eventStatus',
+      label: 'Estados de Eventos'
+    },
+    {
+      key: 'eventTypes',
+      label: 'Tipos de Eventos'
+    },
+    {
+      key: 'paymentMethods',
+      label: 'Métodos de Pago'
+    },
+    {
+      key: 'workstations',
+      label: 'Puestos de Trabajo'
+    }
+  ];
+
+  const getVariantAPI = () => {
+
+    switch (variantSection) {
+
+      case 'clientTypes':
+        return clientTypesAPI;
+
+      case 'suppliers':
+        return suppliersAPI;
+
+      case 'departments':
+        return departmentsAPI;
+
+      case 'elementStatus':
+        return elementStatusAPI;
+
+      case 'eventStatus':
+        return eventStatusAPI;
+
+      case 'eventTypes':
+        return eventTypesAPI;
+
+      case 'paymentMethods':
+        return paymentMethodsAPI;
+
+      case 'workstations':
+        return workstationsAPI;
+
+      default:
+        return clientTypesAPI;
+    }
+  };
+
+  const resetVariantForm = () => {
+
+    setEditingVariantId(null);
+
+    setVariantName('');
+
+    setVariantDescription('');
+
+    setVariantDepartment(undefined);
+  };
+
+  const loadVariants = async () => {
+
+    try {
+
+      setVariantLoading(true);
+
+      const api = getVariantAPI();
+
+      const data = await api.getAll();
+
+      setVariantsData(data || []);
+
+      if (variantSection === 'workstations') {
+
+        const deps =
+          await departmentsAPI.getAll();
+
+        setVariantDepartments(deps || []);
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert(
+        'No se pudieron cargar las variantes.'
+      );
+
+    } finally {
+
+      setVariantLoading(false);
+    }
+  };
+
+  useEffect(() => {
+
+    if (activeTab === 'variantes') {
+
+      loadVariants();
+    }
+
+  }, [variantSection, activeTab]);
 
   function UsersPermissionsSection({
     currentRole
@@ -4548,7 +4402,7 @@ function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogou
                       : undefined
                   )
                 }
-                 className="w-full bg-bg-sidebar border border-border rounded-2xl px-4 py-3 text-sm text-white"
+                className="w-full bg-bg-sidebar border border-border rounded-2xl px-4 py-3 text-sm text-white"
               >
                 <option value="">
                   Usuario
@@ -4911,53 +4765,466 @@ function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogou
             </div>
           )}
 
-          {/* ─── MÉTODOS ─────────────────────────────────────── */}
 
-          {activeTab === 'metodos' && (
-            <div className="space-y-6">
+          {/* ─── VARIANTES ───────────────────────────────────── */}
 
-              <h3 className="text-2xl font-black text-white uppercase">
-                Métodos de pago
-              </h3>
+          {activeTab === 'variantes' && (
 
-              <p className="text-text-muted">
-                Métodos disponibles para facturación y cobros.
-              </p>
+            <div className="space-y-8">
 
-              <div className="bg-bg-deep border border-border rounded-3xl p-6">
+              <div className="flex items-center justify-between">
 
-                {loadingPayments ? (
+                <div>
+
+                  <h3 className="text-2xl font-black text-white uppercase">
+                    Variantes
+                  </h3>
+
                   <p className="text-text-muted">
-                    Cargando métodos de pago...
+                    Configuraciones escalables del sistema.
                   </p>
-                ) : paymentMethods.length === 0 ? (
-                  <p className="text-text-muted">
-                    No hay métodos de pago registrados.
-                  </p>
-                ) : (
-                  <ul className="space-y-3">
 
-                    {paymentMethods.map((method) => (
-                      <li
-                        key={method.id}
-                        className="rounded-3xl border border-border p-4 bg-black/20"
-                      >
-                        <p className="text-sm font-black text-white">
-                          {method.payment_type || 'Tipo desconocido'}
-                        </p>
+                </div>
 
-                        <p className="text-[11px] text-text-muted mt-1">
-                          {method.descript || 'Sin descripción'}
-                        </p>
-                      </li>
-                    ))}
+                <button
+                  type="button"
+                  onClick={() => {
 
-                  </ul>
-                )}
+                    resetVariantForm();
+
+                    setVariantMode(
+                      variantMode === 'list'
+                        ? 'insert'
+                        : 'list'
+                    );
+                  }}
+                  className="bg-primary text-white px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-[0.2em]"
+                >
+                  {variantMode === 'list'
+                    ? 'Nuevo Registro'
+                    : 'Ver Registros'}
+                </button>
 
               </div>
 
+              {/* TABS */}
+
+              <div className="flex flex-wrap gap-3">
+
+                {variantTabs.map((tab) => (
+
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => {
+
+                      setVariantSection(
+                        tab.key as any
+                      );
+
+                      setVariantMode('list');
+
+                      resetVariantForm();
+                    }}
+                    className={`px-5 py-3 rounded-2xl border text-xs font-black uppercase tracking-[0.2em] transition-all ${variantSection === tab.key
+                      ? 'border-primary bg-primary/10 text-white'
+                      : 'border-border bg-bg-deep text-text-muted hover:text-white'
+                      }`}
+                  >
+                    {tab.label}
+                  </button>
+
+                ))}
+
+              </div>
+
+              {/* INSERT */}
+
+              {variantMode === 'insert' && (
+
+                <div className="bg-bg-surface rounded-3xl border border-border p-10">
+
+                  <form
+                    className="space-y-8"
+                    onSubmit={async (e) => {
+
+                      e.preventDefault();
+
+                      try {
+
+                        const api =
+                          getVariantAPI();
+
+                        let payload: any = {
+                          id: editingVariantId
+                        };
+
+                        switch (variantSection) {
+
+                          case 'paymentMethods':
+
+                            payload.payment_type =
+                              variantName.trim();
+
+                            payload.descript =
+                              variantDescription.trim();
+
+                            break;
+
+                          case 'suppliers':
+
+                            payload.provider =
+                              variantName.trim();
+
+                            payload.descript =
+                              variantDescription.trim();
+
+                            break;
+
+                          case 'workstations':
+
+                            payload.title =
+                              variantName.trim();
+
+                            payload.department =
+                              Number(
+                                variantDepartment
+                              );
+
+                            break;
+
+                          default:
+
+                            payload.name =
+                              variantName.trim();
+
+                            break;
+                        }
+
+                        if (
+                          editingVariantId
+                        ) {
+
+                          await api.update(
+                            payload
+                          );
+
+                          alert(
+                            'Registro actualizado.'
+                          );
+
+                        } else {
+
+                          await api.create(
+                            payload
+                          );
+
+                          alert(
+                            'Registro creado.'
+                          );
+                        }
+
+                        await loadVariants();
+
+                        resetVariantForm();
+
+                        setVariantMode('list');
+
+                      } catch (error) {
+
+                        console.error(error);
+
+                        alert(
+                          'No se pudo guardar.'
+                        );
+                      }
+                    }}
+                  >
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+                      <div className="space-y-3">
+
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+
+                          {variantSection === 'paymentMethods'
+                            ? 'Método'
+                            : variantSection === 'suppliers'
+                              ? 'Proveedor'
+                              : variantSection === 'workstations'
+                                ? 'Título'
+                                : 'Nombre'}
+
+                        </label>
+
+                        <input
+                          type="text"
+                          value={variantName}
+                          onChange={(e) =>
+                            setVariantName(
+                              e.target.value
+                            )
+                          }
+                          className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white"
+                          required
+                        />
+
+                      </div>
+
+                      {(
+                        variantSection === 'paymentMethods' ||
+                        variantSection === 'suppliers'
+                      ) && (
+
+                          <div className="space-y-3">
+
+                            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                              Descripción
+                            </label>
+
+                            <input
+                              type="text"
+                              value={
+                                variantDescription
+                              }
+                              onChange={(e) =>
+                                setVariantDescription(
+                                  e.target.value
+                                )
+                              }
+                              className="w-full bg-bg-deep border border-border rounded-2xl px-5 py-4 text-sm text-white"
+                            />
+
+                          </div>
+
+                        )}
+
+                      {variantSection === 'workstations' && (
+
+                        <div className="space-y-3">
+
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted ml-1">
+                            Departamento
+                          </label>
+
+                          <Combobox
+                            options={variantDepartments.map((dep) => ({
+                              id: dep.id.toString(),
+                              label: dep.name,
+                              sublabel: 'Departamento'
+                            }))}
+
+                            value={variantDepartment?.toString()}
+
+                            onChange={(val) =>
+                              setVariantDepartment(
+                                Number(val)
+                              )
+                            }
+
+                            placeholder="Seleccionar departamento"
+                          />
+
+                        </div>
+
+                      )}
+
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full bg-primary text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.3em]"
+                    >
+                      {editingVariantId
+                        ? 'Actualizar'
+                        : 'Registrar'}
+                    </button>
+
+                  </form>
+
+                </div>
+
+              )}
+
+              {/* LIST */}
+
+              {variantMode === 'list' && (
+
+                <div className="bg-bg-surface rounded-3xl border border-border overflow-hidden shadow-xl">
+
+                  <table className="w-full text-left border-collapse">
+
+                    <thead>
+
+                      <tr className="bg-black/40 border-b border-border">
+
+                        <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                          ID
+                        </th>
+
+                        <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">
+                          Información
+                        </th>
+
+                        <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-text-muted text-right">
+                          Control
+                        </th>
+
+                      </tr>
+
+                    </thead>
+
+                    <tbody className="divide-y divide-border">
+
+                      {variantsData.map((item) => (
+
+                        <tr
+                          key={item.id}
+                          className="hover:bg-primary/5 transition-all group"
+                        >
+
+                          <td className="px-8 py-6 text-sm font-black text-white">
+                            #{item.id}
+                          </td>
+
+                          <td className="px-8 py-6">
+
+                            <p className="text-sm font-black text-white">
+
+                              {item.name ||
+                                item.payment_type ||
+                                item.provider ||
+                                item.title}
+
+                            </p>
+
+                            <p className="text-[11px] text-text-muted mt-1">
+
+                              {item.descript ||
+                                item.department_name ||
+                                '--'}
+
+                            </p>
+
+                          </td>
+
+                          <td className="px-8 py-6 text-right space-x-3">
+
+                            <button
+                              onClick={() => {
+
+                                setEditingVariantId(
+                                  item.id
+                                );
+
+                                switch (
+                                variantSection
+                                ) {
+
+                                  case 'paymentMethods':
+
+                                    setVariantName(
+                                      item.payment_type
+                                    );
+
+                                    setVariantDescription(
+                                      item.descript
+                                    );
+
+                                    break;
+
+                                  case 'suppliers':
+
+                                    setVariantName(
+                                      item.provider
+                                    );
+
+                                    setVariantDescription(
+                                      item.descript
+                                    );
+
+                                    break;
+
+                                  case 'workstations':
+
+                                    setVariantName(
+                                      item.title
+                                    );
+
+                                    setVariantDepartment(
+                                      Number(
+                                        item.department
+                                      )
+                                    );
+
+                                    break;
+
+                                  default:
+
+                                    setVariantName(
+                                      item.name
+                                    );
+
+                                    break;
+                                }
+
+                                setVariantMode(
+                                  'insert'
+                                );
+                              }}
+                              className="p-2.5 text-text-muted hover:text-primary bg-bg-deep border border-border rounded-xl transition-all"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+
+                            <button
+                              onClick={async () => {
+
+                                try {
+
+                                  const api =
+                                    getVariantAPI();
+
+                                  await api.delete(
+                                    item.id
+                                  );
+
+                                  setVariantsData(
+                                    (prev) =>
+                                      prev.filter(
+                                        (x) =>
+                                          x.id !== item.id
+                                      )
+                                  );
+
+                                } catch {
+
+                                  alert(
+                                    'No se pudo eliminar.'
+                                  );
+                                }
+                              }}
+                              className="p-2.5 text-text-muted hover:text-red-400 bg-bg-deep border border-border rounded-xl transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+
+                          </td>
+
+                        </tr>
+
+                      ))}
+
+                    </tbody>
+
+                  </table>
+
+                </div>
+
+              )}
+
             </div>
+
           )}
 
           {/* ─── BACKUP ──────────────────────────────────────── */}

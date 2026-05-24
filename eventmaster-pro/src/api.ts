@@ -90,7 +90,8 @@ export const eventsAPI = {
   create: (data: any) => fetchAPI('/eventServices', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: any) => fetchAPI(`/eventServices/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) => fetchAPI(`/eventServices/${id}`, { method: 'DELETE' }),
-  getEmployeeEvents: (userId: number) => fetchAPI(`/eventServices/employee/${userId}`),};
+  getEmployeeEvents: (userId: number) => fetchAPI(`/eventServices/employee/${userId}`),
+};
 
 // ============ TIPOS DE EVENTOS API ============
 export const eventTypesAPI = {

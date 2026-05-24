@@ -3,8 +3,20 @@ import { getPool, sql } from "../configuration/db.js";
 // CREATE
 export const createInventory = async (req, res) => {
   try {
-    const { element, unit_price, actual_price, stock_actual, stock_alert, state, element_type } = req.body;
+
+    const {
+      element,
+      unit_price,
+      actual_price,
+      stock_actual,
+      stock_alert,
+      state,
+      element_type,
+      supplier_id
+    } = req.body;
+
     const pool = getPool();
+
     const result = await pool.request()
       .input("element", sql.VarChar, element)
       .input("unit_price", sql.Decimal(10,2), unit_price)
@@ -13,20 +25,44 @@ export const createInventory = async (req, res) => {
       .input("stock_alert", sql.Int, stock_alert)
       .input("state", sql.Int, state)
       .input("element_type", sql.Bit, element_type)
+      .input("supplier_id", sql.Int, supplier_id || null)
       .execute("sp_create_inv");
 
-    res.json({ message: "Inventario creado ✅", result: result.recordset });
+    res.json({
+      message: "Inventario creado ✅",
+      result: result.recordset
+    });
+
   } catch (error) {
+
     console.error("Error:", error.message || error);
-    res.status(500).json({ message: "Error al crear inventario ❌", error: error.message });
+
+    res.status(500).json({
+      message: "Error al crear inventario ❌",
+      error: error.message
+    });
+
   }
 };
 
 // EDIT
 export const editInventory = async (req, res) => {
   try {
-    const { id, element, unit_price, actual_price, stock_actual, stock_alert, state, element_type } = req.body;
+
+    const {
+      id,
+      element,
+      unit_price,
+      actual_price,
+      stock_actual,
+      stock_alert,
+      state,
+      element_type,
+      supplier_id
+    } = req.body;
+
     const pool = getPool();
+
     const result = await pool.request()
       .input("id", sql.Int, id)
       .input("element", sql.VarChar, element)
@@ -36,12 +72,23 @@ export const editInventory = async (req, res) => {
       .input("stock_alert", sql.Int, stock_alert)
       .input("state", sql.Int, state)
       .input("element_type", sql.Bit, element_type)
+      .input("supplier_id", sql.Int, supplier_id || null)
       .execute("sp_edit_inv");
 
-    res.json({ message: "Inventario actualizado ✅", result: result.recordset });
+    res.json({
+      message: "Inventario actualizado ✅",
+      result: result.recordset
+    });
+
   } catch (error) {
+
     console.error("Error:", error.message || error);
-    res.status(500).json({ message: "Error al editar inventario ❌", error: error.message });
+
+    res.status(500).json({
+      message: "Error al editar inventario ❌",
+      error: error.message
+    });
+
   }
 };
 

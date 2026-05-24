@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 
 // Importar routers
+import suppliersRoutes from "./routes/suppliers.js";
 import itemsRoutes from "./routes/items.routes.js";
 import billsRoutes from "./routes/bills.js";
 import clientTypesRoutes from "./routes/client_type.js";
@@ -54,6 +55,7 @@ app.use("/api/eventServices", eventServicesRoutes);
 app.use("/api/eventStatus", eventStatusRoutes);
 app.use("/api/eventTypes", eventTypesRoutes);
 app.use("/api/expenses", expensesRoutes);
+app.use("/api/suppliers", suppliersRoutes);
 app.use("/api/inventoryAlerts", inventoryAlertsRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/paymentMethods", paymentMethodsRoutes);
