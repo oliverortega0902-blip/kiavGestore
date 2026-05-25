@@ -9,6 +9,11 @@ async function fetchAPI(endpoint: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
 
   try {
+    console.log(
+      'BODY ENVIADO:',
+      options.body
+    );
+
     const response = await fetch(url, {
       cache: 'no-store',
       ...options,
@@ -223,9 +228,68 @@ export const rolesAPI = {
 };
 
 export const authAPI = {
-  login: (username: string, password: string) => fetchAPI('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
-  register: (username: string, password: string) => fetchAPI('/auth/register', { method: 'POST', body: JSON.stringify({ username, password }) }),
-  changePassword: (username: string, oldPassword: string, newPassword: string) => fetchAPI('/auth/change-password', { method: 'POST', body: JSON.stringify({ username, oldPassword, newPassword }) }),
+
+  // LOGIN
+  login: async (
+    username: string,
+    password: string
+  ) => {
+
+    return fetchAPI(
+      '/auth/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          username,
+          password
+        })
+      }
+    );
+  },
+
+  // REGISTER CON VALIDACIÓN DE ADMIN
+  register: async (
+    username: string,
+    password: string,
+    adminUsername: string,
+    adminPassword: string
+  ) => {
+
+    return fetchAPI(
+      '/auth/register',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          username,
+          password,
+
+          adminUsername,
+          adminPassword
+        })
+      }
+    );
+  },
+
+  // CAMBIO DE PASSWORD
+  changePassword: async (
+    username: string,
+    oldPassword: string,
+    newPassword: string
+  ) => {
+
+    return fetchAPI(
+      '/auth/change-password',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          username,
+          oldPassword,
+          newPassword
+        })
+      }
+    );
+  }
+
 };
 
 export const eventEmployeesAPI = {
