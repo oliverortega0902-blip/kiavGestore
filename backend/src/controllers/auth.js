@@ -52,7 +52,7 @@ export const login = async (req, res) => {
         SELECT TOP 1
           u.id,
           u.username,
-          r.role
+          r.name
         FROM users u
 
         INNER JOIN user_roles ur

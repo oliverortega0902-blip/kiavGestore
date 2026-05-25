@@ -2044,8 +2044,8 @@ function InventoryList() {
 
               <span
                 className={`text-[10px] font-black px-3 py-1 rounded-full border ${item.stock_actual <= item.stock_alert
-                    ? 'text-warning bg-warning/10 border-warning/20'
-                    : 'text-success bg-success/10 border-success/20'
+                  ? 'text-warning bg-warning/10 border-warning/20'
+                  : 'text-success bg-success/10 border-success/20'
                   }`}
               >
                 STOCK: {item.stock_actual}
@@ -4214,9 +4214,11 @@ function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogou
   }, [variantSection, activeTab]);
 
   function UsersPermissionsSection({
-    currentRole
+    currentRole,
+    currentUser
   }: {
     currentRole: string;
+    currentUser: User | null;
   }) {
 
     const [users, setUsers] = useState<any[]>([]);
@@ -4389,6 +4391,78 @@ function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogou
 
     };
 
+    const deleteUser = async () => {
+
+      if (!selectedUser) {
+
+        alert('Selecciona un usuario.');
+        return;
+
+      }
+
+      // EVITAR QUE EL ADMIN SE ELIMINE A SI MISMO
+      if (Number(selectedUser) === Number(currentUser?.id)) {
+
+        alert('No puedes eliminar tu propio usuario.');
+        return;
+
+      }
+
+      const selectedUserData = users.find(
+        (u) => Number(u.id) === Number(selectedUser)
+      );
+
+      if (
+        !window.confirm(
+          `¿Eliminar usuario "${selectedUserData?.username}"? Esta acción no se puede deshacer.`
+        )
+      ) return;
+
+      try {
+
+        // ELIMINAR ROLES PRIMERO
+        const userAssignments =
+          await userRolesAPI.getByUserId(
+            Number(selectedUser)
+          );
+
+        if (userAssignments?.length) {
+
+          for (const assignment of userAssignments) {
+
+            await userRolesAPI.delete(
+              assignment.id
+            );
+
+          }
+
+        }
+
+        // ELIMINAR USUARIO
+        await usersAPI.delete(
+          Number(selectedUser)
+        );
+
+        alert('Usuario eliminado.');
+
+        setSelectedUser(undefined);
+        setSelectedRole(undefined);
+        setAssignments([]);
+
+        await loadData();
+
+      } catch (error) {
+
+        console.error(error);
+
+        alert(
+          'No se pudo eliminar el usuario.'
+        );
+
+      }
+
+    };
+
     if (!isAdmin) {
 
       return (
@@ -4491,16 +4565,29 @@ function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogou
 
               </select>
 
-              <button
-                type="button"
-                disabled={saving}
-                onClick={assignRole}
-                className="w-full bg-primary text-black rounded-2xl px-5 py-4 font-black hover:bg-primary/90 transition"
-              >
-                {saving
-                  ? 'Guardando...'
-                  : 'Guardar rol'}
-              </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={assignRole}
+                  className="w-full bg-primary text-black rounded-2xl px-5 py-4 font-black hover:bg-primary/90 transition"
+                >
+                  {saving
+                    ? 'Guardando...'
+                    : 'Guardar rol'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={deleteUser}
+                  disabled={!selectedUser}
+                  className="w-full bg-red-500/10 border border-red-500/20 text-red-300 rounded-2xl px-5 py-4 font-black hover:bg-red-500/15 transition disabled:opacity-40"
+                >
+                  Eliminar usuario
+                </button>
+
+              </div>
 
             </div>
 
@@ -5334,7 +5421,10 @@ function ConfigurationSection({ currentUser, currentRole, currentRoleId, onLogou
           {/* ─── USUARIOS ───────────────────────────────────── */}
 
           {activeTab === 'usuarios' && (
-            <UsersPermissionsSection currentRole={currentRole} />
+            <UsersPermissionsSection
+              currentRole={currentRole}
+              currentUser={currentUser}
+            />
           )}
 
           {activeTab === 'miCuenta' && (
